@@ -14,6 +14,7 @@
     "test": "turbo run test",
     "test:coverage": "pnpm --filter @aeokit-webapp/server test:coverage",
     "test:e2e": "pnpm exec playwright test",
+    "test:e2e:coverage": "pnpm test:coverage && pnpm test:e2e",
     "test:all": "pnpm test && pnpm test:e2e",
     "clean": "turbo daemon stop 2>/dev/null || true; rm -rf .turbo && pnpm -r exec -- sh -c 'rm -rf dist'",
     "clean:all": "turbo daemon stop 2>/dev/null || true; rm -rf .turbo node_modules && pnpm -r exec -- sh -c 'rm -rf dist node_modules'"

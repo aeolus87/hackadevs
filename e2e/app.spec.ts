@@ -1,7 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-test('home loads', async ({ page }) => {
-  await page.goto('/')
-  await expect(page.getByTestId('home-title')).toBeVisible()
-  await expect(page.getByTestId('home-blurb')).toBeVisible()
+test('feed loads', async ({ page }) => {
+  await page.goto('/feed')
+  await expect(page.getByTestId('feed-root')).toBeVisible()
 })

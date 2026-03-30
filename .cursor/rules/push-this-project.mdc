@@ -1,0 +1,17 @@
+---
+description: When user says "push this project" — commit quality, SSH, aeolus87/hackadevs only
+alwaysApply: true
+---
+
+# Push this project
+
+When the user says **"push this project"** (or clearly means the same: ship commits, push to GitHub), do this:
+
+1. **Remote** — Push **only** to this repository, **via SSH**, under GitHub user **aeolus87**:
+   - Canonical: [https://github.com/aeolus87/hackadevs](https://github.com/aeolus87/hackadevs)
+   - SSH URL form: `git@github.com:aeolus87/hackadevs.git` (or an SSH host alias in `~/.ssh/config` that still authenticates as **aeolus87** and targets **aeolus87/hackadevs** — never HTTPS `https://github.com/...` for push).
+2. If `origin` (or the remote you push to) is not that repo, set it before pushing, e.g. `git remote set-url origin git@github.com:aeolus87/hackadevs.git` (adjust host if their SSH config uses `github.com-aeolus87` but the path must remain `aeolus87/hackadevs`).
+3. **Commit message** — Use a **strong conventional commit**: clear type (`feat`, `fix`, `chore`, `refactor`, `test`, `docs`, …), imperative subject, optional body if the change needs context. Write like a human lead dev — **never** include "Made with Cursor", "Co-authored-by" bots, or any editor/AI attribution.
+4. **Flow** — Review `git status` / diff, stage intentionally, one logical commit (or separate commits only if the user already has distinct changes they want split), then `git push` to the correct SSH remote.
+
+Do **not** push to any other GitHub repo or user for this project. Do **not** use PAT/credential-based HTTPS push when SSH is available.

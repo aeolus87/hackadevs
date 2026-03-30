@@ -1,7 +1,6 @@
 import axios from 'axios'
+import { AUTH_STORAGE_KEY } from '@/lib/auth-storage'
 import { BASE_URL } from './api.routes'
-
-const AUTH_STORAGE_KEY = 'aeokit.auth'
 
 function getTokenFromStore(): string | null {
   try {
@@ -26,3 +25,20 @@ axiosInstance.interceptors.request.use((config) => {
   }
   return config
 })
+
+axiosInstance.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (axios.isAxiosError(err)) {
+      if (err.response?.status === 401) {
+        localStorage.removeItem(AUTH_STORAGE_KEY)
+        window.location.replace('/login')
+      }
+      const s = err.response?.status
+      if (s != null && s >= 500) {
+        console.error('[api]', err.config?.method?.toUpperCase(), err.config?.url, s)
+      }
+    }
+    return Promise.reject(err)
+  },
+)

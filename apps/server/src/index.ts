@@ -28,7 +28,10 @@ async function start() {
   })
 
   await fastify.register(helmet, { contentSecurityPolicy: false })
-  await fastify.register(apiRoutes, { prefix: '/api' })
+  await fastify.register(apiRoutes, {
+    prefix: '/api',
+    jwtSecret: env.JWT_SECRET ?? 'development-jwt-secret-min-16-chars',
+  })
 
   await fastify.listen({ port: env.PORT, host: '0.0.0.0' })
   fastify.log.info(`Server running at http://localhost:${env.PORT}`)

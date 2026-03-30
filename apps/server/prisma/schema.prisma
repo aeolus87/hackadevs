@@ -1,0 +1,425 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserTier {
+  NOVICE
+  APPRENTICE
+  ENGINEER
+  SENIOR
+  STAFF
+  PRINCIPAL
+  LEGEND
+}
+
+enum SelfDeclaredLevel {
+  JUNIOR
+  MID
+  SENIOR
+}
+
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum Categories {
+  BACKEND
+  FRONTEND
+  SYSTEM_DESIGN
+  SECURITY
+  DATA_ENGINEERING
+  ML_OPS
+  DEVOPS
+  FULLSTACK
+}
+
+enum ChallengeDifficulty {
+  BEGINNER
+  MEDIUM
+  HARD
+  LEGENDARY
+}
+
+enum ChallengeStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
+enum SubmissionLanguage {
+  JS
+  TS
+  PYTHON
+  GO
+  RUST
+  JAVA
+  CPP
+  CSHARP
+  RUBY
+}
+
+enum SubmissionStatus {
+  DRAFT
+  SUBMITTED
+  EVALUATED
+  PUBLISHED
+  FLAGGED
+  WITHDRAWN
+}
+
+enum RepEventType {
+  SUBMISSION_BASE
+  RANK_MULTIPLIER
+  SPEED_BONUS
+  RATIONALE_BONUS
+  VOTE_BONUS
+  STREAK_BONUS
+  DECAY
+  REVERSAL
+  MANUAL_ADJUSTMENT
+}
+
+enum VoteValue {
+  UP
+  DOWN
+}
+
+enum NotificationType {
+  VOTE_RECEIVED
+  FOLLOWED
+  CHALLENGE_CLOSING
+  RANK_CHANGE
+  BADGE_EARNED
+  SOLUTION_FEATURED
+  COMPANY_BOOKMARKED
+}
+
+enum BadgeType {
+  WEEKLY_CHAMPION
+  STREAK_7
+  STREAK_30
+  STREAK_100
+  TOP_VOTED
+  FIRST_LEGENDARY
+  CATEGORY_RANK_1
+}
+
+enum ModerationTargetType {
+  SUBMISSION
+  USER
+  CHALLENGE
+}
+
+enum ModerationAction {
+  APPROVED
+  REJECTED
+  WARNED
+  BANNED
+  ESCALATED
+  APPEALED
+}
+
+enum CompanyChallengeStatus {
+  PENDING
+  SANITISING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id                    String            @id @default(cuid())
+  username              String            @unique
+  email                 String            @unique
+  passwordHash          String
+  displayName           String
+  tagline               String?
+  avatarUrl             String?
+  githubUrl             String?
+  linkedinUrl           String?
+  websiteUrl            String?
+  twitterUrl            String?
+  githubAccessToken     String?
+  totalRep              Int               @default(0)
+  weeklyRepDelta        Int               @default(0)
+  globalRank            Int?
+  currentStreakDays     Int               @default(0)
+  longestStreakDays     Int               @default(0)
+  lastSubmissionDate    DateTime?
+  streakGracesRemaining Int               @default(1)
+  tier                  UserTier          @default(NOVICE)
+  selfDeclaredLevel     SelfDeclaredLevel @default(MID)
+  isVerified            Boolean           @default(false)
+  isBanned              Boolean           @default(false)
+  banReason             String?
+  role                  UserRole          @default(USER)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  deletedAt             DateTime?
+
+  categoryReps          CategoryRep[]
+  challengesCreated     Challenge[]       @relation("ChallengeCreator")
+  submissions           Submission[]
+  repEvents             RepEvent[]
+  votesCast             Vote[]            @relation("Voter")
+  followsAsFollower     Follow[]          @relation("Follower")
+  followsAsFollowee     Follow[]          @relation("Followee")
+  notifications         Notification[]
+  badges                Badge[]
+  moderationActions     ModerationLog[]   @relation("Moderator")
+  refreshTokens         RefreshToken[]
+  pinnedSubmissions     UserPinnedSubmission[]
+  companyBookmarks      CompanyBookmark[]
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model CategoryRep {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id])
+  category  Categories
+  rep       Int        @default(0)
+  rank      Int?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  deletedAt DateTime?
+
+  @@unique([userId, category])
+}
+
+model Challenge {
+  id                        String              @id @default(cuid())
+  slug                      String              @unique
+  title                     String
+  problemStatement          String
+  constraints               String[]
+  bonusObjective            String?
+  exampleInput              String?
+  exampleOutput             String?
+  tags                      String[]
+  category                  Categories
+  difficulty                ChallengeDifficulty
+  difficultyConfidence      Float?
+  weekTheme                 String
+  status                    ChallengeStatus     @default(DRAFT)
+  opensAt                   DateTime
+  closesAt                  DateTime
+  companySource             String?
+  companyAttributionOptIn   Boolean             @default(true)
+  submissionCount           Int                 @default(0)
+  testSuite                 Json
+  createdByAdminId          String?
+  createdByAdmin            User?               @relation("ChallengeCreator", fields: [createdByAdminId], references: [id])
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+  deletedAt                 DateTime?
+
+  submissions               Submission[]
+  repEvents                 RepEvent[]
+  companyChallenges         CompanyChallenge[]
+}
+
+model Submission {
+  id                   String             @id @default(cuid())
+  userId               String
+  user                 User               @relation(fields: [userId], references: [id])
+  challengeId          String
+  challenge            Challenge          @relation(fields: [challengeId], references: [id])
+  code                 String
+  language             SubmissionLanguage
+  rationaleApproach    String
+  rationaleTradeoffs   String
+  rationaleScale       String
+  selfTags             String[]
+  selfDifficultyRating Int
+  status               SubmissionStatus   @default(DRAFT)
+  testScore            Float?
+  testsPassedCount     Int?
+  testsTotalCount      Int?
+  rationaleScore       Int?
+  rationaleClarity     Int?
+  rationaleDepth       Int?
+  rationaleHonesty     Int?
+  rationaleScalability Int?
+  rationaleSummary     String?
+  rationaleFlags       String[]
+  voteScore            Float?
+  upvoteCount          Int                @default(0)
+  downvoteCount        Int                @default(0)
+  compositeScore       Float?
+  preliminaryRank      Int?
+  finalRank            Int?
+  repAwarded           Int?
+  executionTimeMs      Int?
+  memoryUsedMb         Float?
+  submittedAt          DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  deletedAt            DateTime?
+
+  repEvents            RepEvent[]
+  votes                Vote[]
+  pins                 UserPinnedSubmission[]
+  companyBookmarks     CompanyBookmark[]
+
+  @@unique([userId, challengeId])
+}
+
+model UserPinnedSubmission {
+  id           String     @id @default(cuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id])
+  submissionId String
+  submission   Submission @relation(fields: [submissionId], references: [id])
+  sortOrder    Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+
+  @@unique([userId, submissionId])
+}
+
+model RepEvent {
+  id           String       @id @default(cuid())
+  userId       String
+  user         User         @relation(fields: [userId], references: [id])
+  type         RepEventType
+  amount       Int
+  submissionId String?
+  submission   Submission?  @relation(fields: [submissionId], references: [id])
+  challengeId  String?
+  challenge    Challenge?   @relation(fields: [challengeId], references: [id])
+  category     Categories?
+  note         String?
+  createdAt    DateTime     @default(now())
+}
+
+model Vote {
+  id               String     @id @default(cuid())
+  voterId          String
+  voter            User       @relation("Voter", fields: [voterId], references: [id])
+  submissionId     String
+  submission       Submission @relation(fields: [submissionId], references: [id])
+  value            VoteValue
+  voterRepAtTime   Int
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  deletedAt        DateTime?
+
+  @@unique([voterId, submissionId])
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  follower    User     @relation("Follower", fields: [followerId], references: [id])
+  followeeId  String
+  followee    User     @relation("Followee", fields: [followeeId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  @@unique([followerId, followeeId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  type      NotificationType
+  title     String
+  body      String
+  isRead    Boolean          @default(false)
+  metadata  Json?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  deletedAt DateTime?
+}
+
+model Badge {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  type       BadgeType
+  metadata   Json?
+  awardedAt  DateTime  @default(now())
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+}
+
+model ModerationLog {
+  id           String               @id @default(cuid())
+  moderatorId  String
+  moderator    User                 @relation("Moderator", fields: [moderatorId], references: [id])
+  targetType   ModerationTargetType
+  targetId     String
+  action       ModerationAction
+  reason       String
+  note         String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  deletedAt    DateTime?
+}
+
+model CompanyPortal {
+  id           String              @id @default(cuid())
+  companyName  String
+  domainEmail  String              @unique
+  linkedinUrl  String
+  isVerified   Boolean             @default(false)
+  verifiedAt   DateTime?
+  contactName  String
+  contactEmail String
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  deletedAt    DateTime?
+
+  challenges   CompanyChallenge[]
+  bookmarks    CompanyBookmark[]
+}
+
+model CompanyChallenge {
+  id               String                 @id @default(cuid())
+  portalId         String
+  portal           CompanyPortal          @relation(fields: [portalId], references: [id])
+  rawProblem       String
+  sanitisedProblem String?
+  status           CompanyChallengeStatus @default(PENDING)
+  challengeId      String?
+  challenge        Challenge?             @relation(fields: [challengeId], references: [id])
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  deletedAt        DateTime?
+}
+
+model CompanyBookmark {
+  id             String        @id @default(cuid())
+  portalId       String
+  portal         CompanyPortal @relation(fields: [portalId], references: [id])
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  submissionId   String
+  submission     Submission    @relation(fields: [submissionId], references: [id])
+  notifiedUser   Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+}

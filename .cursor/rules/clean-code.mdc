@@ -1,0 +1,39 @@
+---
+description: Zero dead code and file size discipline
+alwaysApply: true
+---
+
+# Clean Code
+
+## No Dead Code
+
+- Delete unused imports, variables, functions, and types immediately after editing a file.
+- Never comment out code "for later" — git has history.
+- After every edit, scan the file for anything that lost its last caller. Remove it.
+- If removing dead code creates more dead code upstream, follow the chain and clean it all.
+
+## No Unused Exports
+
+- If a function or type is exported but nothing imports it, remove the export or the function.
+- Run a quick check: before finishing work on a file, verify every export has at least one consumer.
+
+## File Size Discipline
+
+- If a file grows past ~150 lines of logic, split it.
+- Extract into a sibling file in the same directory — don't create new folders for one file.
+- Name the extracted file after what it does (e.g., `snapshot.ts` from `index.ts`, `heartbeat.ts` from `detector.ts`).
+- The original file imports from the new one — callers outside the directory don't change.
+
+## When to Split
+
+Split when any of these appear:
+- A file has 2+ unrelated responsibilities (e.g., route handlers AND background jobs).
+- A helper function has grown complex enough to need its own tests.
+- You're scrolling past unrelated code to find what you're editing.
+
+## How to Split
+
+1. Move the function(s) to a new file in the same directory.
+2. Export from the new file, import in the old file.
+3. Update any direct importers if the export moved.
+4. Verify no broken imports or orphaned exports remain.

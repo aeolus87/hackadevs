@@ -1,0 +1,16 @@
+---
+description: Do not add code comments when implementing or editing
+alwaysApply: true
+---
+
+# No Comments in Implementations
+
+When you implement, fix, or refactor code in this repo:
+
+- Do **not** add new comments of any kind: no `//`, `/* */`, block comments, or JSDoc/TSDoc on code you write or change.
+- Do **not** add `TODO`, `FIXME`, or explanatory notes in code — use clear names, small functions, and structure instead.
+- Do **not** add comments to describe what the diff does; the code and commit message carry intent.
+
+**Exceptions (only when the user explicitly asks in that task):** documentation blocks, license headers they request, or comments they specifically want added.
+
+**Existing comments:** Do not bulk-remove unrelated comments unless the user asks; focus on not introducing new ones in your changes.

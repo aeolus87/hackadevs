@@ -1,0 +1,20 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      dev-eslint-prettier:
+        patterns:
+          - '@eslint/*'
+          - 'eslint*'
+          - 'prettier'
+          - 'typescript-eslint'
+      dev-testing:
+        patterns:
+          - '@playwright/*'
+          - '@testing-library/*'
+          - 'vitest'
+          - '@vitest/*'

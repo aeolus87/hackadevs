@@ -1,0 +1,12 @@
+---
+description: How to add or upgrade npm dependencies in this monorepo
+alwaysApply: true
+---
+
+# Dependencies
+
+- Before adding a dependency, confirm the **current stable version** on the registry (or release notes) instead of reusing stale ranges from other projects.
+- Prefer `pnpm add <package>@latest` (or an explicit version you verified) when introducing a new dependency; for workspace packages use `pnpm add <pkg> --filter <package-name>`.
+- After changes, run `pnpm lint` and `pnpm typecheck` (and tests when behavior is affected).
+- Respect existing peer dependency constraints (e.g. `@fastify/type-provider-typebox` major must match the Fastify major).
+- Do not add a dependency for logic solvable in a few lines with built-in APIs unless there is a clear, agreed reason.

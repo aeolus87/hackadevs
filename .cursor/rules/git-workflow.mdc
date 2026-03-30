@@ -1,0 +1,49 @@
+---
+description: Git branching strategy, commit conventions, and workflow
+alwaysApply: true
+---
+
+# Git Workflow
+
+## Branch Strategy
+
+- `main` — production branch. Only receives merges from `development` when a release is ready.
+- `development` — integration branch. All feature branches merge here.
+- Feature branches — created from `development` for every new feature, fix, or task.
+
+### Branch Naming
+
+```
+feature/<short-description>    # new features
+fix/<short-description>        # bug fixes
+chore/<short-description>      # maintenance, deps, config
+refactor/<short-description>   # refactoring without behavior change
+```
+
+### Workflow
+
+1. Always branch off `development` for new work.
+2. Keep feature branches short-lived — merge back quickly.
+3. Never commit directly to `main` or `development`.
+4. After merging to `development`, delete the feature branch.
+
+## Commit Conventions
+
+Use conventional commits. Keep messages concise and meaningful.
+
+```
+feat: add user profile page
+fix: prevent duplicate socket connections on reconnect
+chore: update axios to 1.7
+refactor: simplify board store actions
+test: add e2e for login flow
+```
+
+### Rules
+
+- One logical change per commit — don't bundle unrelated changes.
+- Write the **why**, not the what (the diff shows the what).
+- No WIP commits on shared branches. Squash or amend locally before pushing.
+- Stage intentionally — review `git diff --staged` before committing.
+- Never commit `.env`, secrets, `node_modules`, or build artifacts.
+- Do not put editor or AI tool attribution in commit messages (e.g. no "made with Cursor", "Co-authored-by: bot", or similar unless the project explicitly requires it).

@@ -1,0 +1,43 @@
+---
+description: Code quality principles — simplicity over cleverness
+alwaysApply: true
+---
+
+# Code Quality
+
+## No Over-Engineering
+
+- Solve today's problem. Don't build abstractions for hypothetical futures.
+- If a pattern adds indirection without clear benefit, skip it.
+- Prefer flat, readable code over deeply nested abstractions.
+- One level of abstraction is usually enough. Factory-of-factory patterns are a red flag.
+- Don't create a util/helper until the same logic appears 3+ times.
+
+## Simplicity Checklist
+
+Before adding code, ask:
+1. Does this solve an actual current requirement?
+2. Could this be simpler and still work?
+3. Will another developer understand this in 6 months without a guide?
+
+If any answer is "no", simplify.
+
+## Dependencies
+
+- Every new dependency is a liability. Justify it.
+- Prefer built-in APIs (`fetch`, `URL`, `crypto.randomUUID`) over installing packages.
+- When you do add a package, pin it and check its maintenance status and bundle size.
+- Never install a package for something achievable in <20 lines of code.
+
+## Code Style
+
+- Small functions with clear names beat comments explaining complex functions.
+- Early returns over nested if/else chains.
+- Colocate related code — don't scatter logic across many files for the sake of "separation."
+- Delete dead code. Don't comment it out "just in case" — git has history.
+
+## PR & Review Mindset
+
+- Every PR should be reviewable in <15 minutes. If it's bigger, break it up.
+- The diff should tell a story — logical commit order, clear intent.
+- Don't mix refactors with features in the same PR.

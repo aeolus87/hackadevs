@@ -1,0 +1,39 @@
+---
+description: Build and linting configuration for zero-friction development
+alwaysApply: true
+---
+
+# Build & Linting
+
+## Principle
+
+Linting exists to catch real bugs, not to annoy. Every rule must earn its place. If a rule triggers false positives or bikesheds style that doesn't matter, disable it.
+
+## ESLint Configuration
+
+- Use flat config (`eslint.config.js`) — no legacy `.eslintrc`.
+- Start minimal. Only add rules that prevent actual bugs or enforce critical consistency.
+- Disable these noise rules if they appear:
+  - `no-unused-vars` → use `@typescript-eslint/no-unused-vars` with `argsIgnorePattern: "^_"` and `varsIgnorePattern: "^_"`
+  - `react/react-in-jsx-scope` → not needed with React 17+ JSX transform
+  - `react/prop-types` → TypeScript handles this
+  - `import/order` → nice-to-have at best, never block a build for it
+- Set `reportUnusedDisableDirectives: true` to clean up stale disables.
+
+## TypeScript
+
+- Use `strict: true` but don't pile on extra strictness flags that cause friction.
+- Prefer `skipLibCheck: true` to avoid fighting third-party type issues.
+- Never use `any` as a lazy escape — use `unknown` and narrow, or define a proper type.
+
+## Build
+
+- Keep builds fast. Don't add unnecessary plugins or transforms.
+- If a build warning is informational and not actionable, suppress it.
+- Vite config should stay lean — no custom plugins unless solving a real problem.
+
+## Formatting
+
+- Use Prettier OR ESLint for formatting — never both fighting each other.
+- Pick one and configure the other to defer. Recommend Prettier for formatting, ESLint for logic rules only.
+- Tab width, semicolons, quotes — pick once, configure once, never debate again.

@@ -4,7 +4,9 @@ import Home from '@/pages/Home'
 
 vi.mock('@/utils/axios.instance', () => ({
   axiosInstance: {
-    get: vi.fn(() => Promise.resolve({ data: { status: 'ok' as const, timestamp: new Date().toISOString() } })),
+    get: vi.fn(() =>
+      Promise.resolve({ data: { status: 'ok' as const, timestamp: new Date().toISOString() } }),
+    ),
   },
 }))
 

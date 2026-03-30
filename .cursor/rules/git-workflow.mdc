@@ -46,4 +46,6 @@ test: add e2e for login flow
 - No WIP commits on shared branches. Squash or amend locally before pushing.
 - Stage intentionally — review `git diff --staged` before committing.
 - Never commit `.env`, secrets, `node_modules`, or build artifacts.
-- Do not put editor or AI tool attribution in commit messages (e.g. no "made with Cursor", "Co-authored-by: bot", or similar unless the project explicitly requires it).
+- **Never** append the git trailer `Made-with: Cursor` (or `Made with Cursor`, case variants, or similar). If a tool prepends/appends it, remove it before the commit is final.
+- Do not put other editor or AI attribution in commit messages (no "Co-authored-by: bot" unless the project explicitly requires it).
+- **Cursor IDE:** turn off Agent commit trailers under **Cursor Settings → Agent → Attribution** ([Git integration docs](https://cursor.com/docs/integrations/git)).

@@ -51,8 +51,8 @@ importers:
         specifier: ^9.1.0
         version: 9.1.0
       '@fastify/type-provider-typebox':
-        specifier: ^4.1.0
-        version: 4.1.0(@sinclair/typebox@0.33.22)
+        specifier: ^6.1.0
+        version: 6.1.0(typebox@1.1.10)
       '@prisma/client':
         specifier: ^5.22.0
         version: 5.22.0(prisma@5.22.0)
@@ -914,10 +914,10 @@ packages:
   '@fastify/rate-limit@9.1.0':
     resolution: {integrity: sha512-h5dZWCkuZXN0PxwqaFQLxeln8/LNwQwH9popywmDCFdKfgpi4b/HoMH1lluy6P+30CG9yzzpSpwTCIPNB9T1JA==}
 
-  '@fastify/type-provider-typebox@4.1.0':
-    resolution: {integrity: sha512-mXNBaBEoS6Yf4/O2ujNhu9yEZwvBC7niqRESsiftE9NP1hV6ZdV3ZsFbPf1S520BK3rTZ0F28zr+sMdIXNJlfw==}
+  '@fastify/type-provider-typebox@6.1.0':
+    resolution: {integrity: sha512-k29cOitDRcZhMXVjtRq0+caKxdWoArz7su+dQWGzGWnFG+fSKhevgiZ7nexHWuXOEEQzgJlh6cptIMu69beaTA==}
     peerDependencies:
-      '@sinclair/typebox': '>=0.26 <=0.33'
+      typebox: ^1.0.13
 
   '@humanfs/core@0.19.1':
     resolution: {integrity: sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==}
@@ -2755,6 +2755,9 @@ packages:
     resolution: {integrity: sha512-XleUoc9uwGXqjWwXaUTZAmzMcFZ5858QA2vvx1Ur5xIcixXIP+8LnFDgRplU30us6teqdlskFfu+ae4K79Ooew==}
     engines: {node: '>= 0.8.0'}
 
+  typebox@1.1.10:
+    resolution: {integrity: sha512-BT5P4zFUEBn87nMCimp6RuPzjAYK6EusisqLs7qQ+r4iVpGa2uY9fqznmWX0T21h0UW6b/JGLnwcEIyIxjqcaw==}
+
   typescript-eslint@8.58.0:
     resolution: {integrity: sha512-e2TQzKfaI85fO+F3QywtX+tCTsu/D3WW5LVU6nz8hTFKFZ8yBJ6mSYRpXqdR3mFjPWmO0eWsTa5f+UpAOe/FMA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
@@ -3833,9 +3836,9 @@ snapshots:
       fastify-plugin: 4.5.1
       toad-cache: 3.7.0
 
-  '@fastify/type-provider-typebox@4.1.0(@sinclair/typebox@0.33.22)':
+  '@fastify/type-provider-typebox@6.1.0(typebox@1.1.10)':
     dependencies:
-      '@sinclair/typebox': 0.33.22
+      typebox: 1.1.10
 
   '@humanfs/core@0.19.1': {}
 
@@ -5771,6 +5774,8 @@ snapshots:
   type-check@0.4.0:
     dependencies:
       prelude-ls: 1.2.1
+
+  typebox@1.1.10: {}
 
   typescript-eslint@8.58.0(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3):
     dependencies:

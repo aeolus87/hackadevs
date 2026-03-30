@@ -1,5 +1,64 @@
 @import 'tailwindcss';
 
-body {
-  margin: 0;
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --color-hd-page: #0a0a0b;
+  --color-hd-surface: #111114;
+  --color-hd-card: #18181c;
+  --color-hd-elevated: #1f1f25;
+
+  --color-hd-text: #f4f4f5;
+  --color-hd-secondary: #a1a1aa;
+  --color-hd-muted: #52525b;
+
+  --color-hd-indigo: #6366f1;
+  --color-hd-indigo-hover: #818cf8;
+  --color-hd-indigo-tint: #e0e7ff;
+
+  --color-hd-emerald: #10b981;
+  --color-hd-emerald-light: #6ee7b7;
+
+  --color-hd-amber: #f59e0b;
+  --color-hd-amber-light: #fde68a;
+
+  --color-hd-rose: #f43f5e;
+  --color-hd-rose-light: #ffe4e6;
+
+  --color-hd-border: rgb(255 255 255 / 0.06);
+  --color-hd-border-hover: rgb(255 255 255 / 0.12);
+  --color-hd-indigo-surface: rgb(99 102 241 / 0.08);
+  --color-hd-hover: rgb(255 255 255 / 0.04);
+  --color-hd-row-hover: rgb(255 255 255 / 0.03);
+
+  --shadow-hd-card: 0 4px 8px rgb(0 0 0 / 0.4);
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-hd-page);
+    color: var(--color-hd-text);
+    font-weight: 400;
+  }
+
+  code,
+  pre,
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+}
+
+::view-transition-group(*),
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: 0.25s;
+  animation-timing-function: cubic-bezier(0.19, 1, 0.22, 1);
 }

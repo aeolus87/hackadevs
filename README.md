@@ -64,11 +64,12 @@ pnpm format
 pnpm typecheck
 pnpm test
 pnpm test:e2e
+pnpm test:e2e:coverage   # server Vitest coverage, then Playwright
 ```
 
 Install Playwright browser once: `make test:e2e-install`.
 
-E2E starts only the web and server dev tasks via Turbo (not the entire workspace graph).
+E2E uses `scripts/playwright-serve.mjs`: API on port **4010** (`FRONTEND_URL=http://127.0.0.1:3123`), Vite on **3123** (`VITE_API_URL=http://127.0.0.1:4010/api`), so it does not collide with a normal dev server on **3000**/**4000**. Set `PLAYWRIGHT_SKIP_WEBSERVER=1` if you already have the app running and want Playwright to attach only.
 
 ## Clean
 

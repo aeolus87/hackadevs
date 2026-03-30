@@ -22,7 +22,7 @@
     "@fastify/rate-limit": "^9.1.0",
     "@fastify/type-provider-typebox": "^4.1.0",
     "@prisma/client": "^5.22.0",
-    "@sinclair/typebox": "^0.33.22",
+    "@sinclair/typebox": "^0.34.49",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.3.1",
     "fastify": "^4.28.1",

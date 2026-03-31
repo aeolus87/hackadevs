@@ -5,7 +5,7 @@ import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import helmet from '@fastify/helmet'
 import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
-import { parseServerEnv } from '@aeokit-webapp/config'
+import { parseServerEnv } from '@hackadevs/config'
 import { apiRoutes } from './api-routes.js'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')

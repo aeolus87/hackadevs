@@ -29,7 +29,7 @@ function waitForHealth(maxMs = 120_000) {
   })
 }
 
-const server = spawn('pnpm', ['--filter', '@aeokit-webapp/server', 'exec', 'tsx', 'src/index.ts'], {
+const server = spawn('pnpm', ['--filter', '@hackadevs/server', 'exec', 'tsx', 'src/index.ts'], {
   cwd: root,
   env: {
     ...process.env,
@@ -50,7 +50,7 @@ await waitForHealth()
 
 const web = spawn(
   'pnpm',
-  ['--filter', '@aeokit-webapp/web', 'exec', 'vite', '--port', '3123', '--host', '127.0.0.1'],
+  ['--filter', '@hackadevs/web', 'exec', 'vite', '--port', '3123', '--host', '127.0.0.1'],
   {
     cwd: root,
     env: {

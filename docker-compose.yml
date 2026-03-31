@@ -2,18 +2,19 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: aeokit
-      POSTGRES_PASSWORD: aeokit_pass
-      POSTGRES_DB: aeokit_db
+      POSTGRES_USER: hackadevs
+      POSTGRES_PASSWORD: hackadevs
+      POSTGRES_DB: hackadevs
     ports:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U aeokit -d aeokit_db']
-      interval: 5s
+      test: ['CMD-SHELL', 'pg_isready -U hackadevs -d hackadevs']
+      interval: 3s
       timeout: 5s
-      retries: 5
+      retries: 20
+      start_period: 30s
 
 volumes:
   postgres_data:

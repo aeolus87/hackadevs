@@ -1,4 +1,4 @@
-# aeokit-webapp
+# hackadevs
 
 pnpm monorepo: Fastify API (`apps/server`), Vite + React (`apps/web`), shared packages (`packages/*`).
 
@@ -41,7 +41,7 @@ HTTP JSON routes live under **`/api`** (e.g. `GET /api/health`). Route handlers 
 ## Web API client
 
 - `apps/web/src/utils/api.routes.ts` — `BASE_URL` should include the `/api` suffix (see `.env.example`), plus `SOCKET_SERVER` (origin without `/api`)
-- `apps/web/src/utils/axios.instance.ts` — shared Axios client, `Authorization` from `localStorage` key `aeokit.auth` (Zustand-persist shape)
+- `apps/web/src/utils/axios.instance.ts` — shared Axios client, `Authorization` from `localStorage` key `hackadevs.auth` (Zustand-persist shape)
 - `apps/web/src/hooks/` — e.g. `useApiHealth` calling `GET /health` relative to `BASE_URL` (i.e. `/api/health` when `VITE_API_URL` ends with `/api`)
 
 Override the API base with `VITE_API_URL` (see `.env.example`).
@@ -80,7 +80,7 @@ E2E uses `scripts/playwright-serve.mjs`: API on port **4010** (`FRONTEND_URL=htt
 
 | Path              | Package                                        |
 | ----------------- | ---------------------------------------------- |
-| `apps/server`     | `@aeokit-webapp/server`                        |
-| `apps/web`        | `@aeokit-webapp/web`                           |
-| `packages/config` | `@aeokit-webapp/config` (Zod env)              |
-| `packages/core`   | `@aeokit-webapp/core` (shared types/constants) |
+| `apps/server`     | `@hackadevs/server`                        |
+| `apps/web`        | `@hackadevs/web`                           |
+| `packages/config` | `@hackadevs/config` (Zod env)              |
+| `packages/core`   | `@hackadevs/core` (shared types/constants) |

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { HealthResponse } from '@aeokit-webapp/core'
+import type { HealthResponse } from '@hackadevs/core'
 import { axiosInstance } from '@/utils/axios.instance'
 import { HEALTH } from '@/utils/api.routes'
 

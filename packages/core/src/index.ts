@@ -4,7 +4,7 @@ export type AppMeta = {
 }
 
 export const appMeta: AppMeta = {
-  name: 'aeokit-webapp',
+  name: 'hackadevs',
   version: '0.0.1',
 }
 

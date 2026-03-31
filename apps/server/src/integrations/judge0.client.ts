@@ -24,12 +24,14 @@ const DEFAULT_LIMITS = {
   memory_limit: 262144,
 }
 
-export function createJudge0Client(apiUrl: string, apiKey: string) {
+export function createJudge0Client(apiUrl: string, apiKey?: string) {
   const base = apiUrl.replace(/\/$/, '')
-  const headers = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
-    Authorization: `Bearer ${apiKey}`,
+  }
+  if (apiKey) {
+    headers.Authorization = `Bearer ${apiKey}`
   }
 
   async function createSubmission(body: Record<string, unknown>) {

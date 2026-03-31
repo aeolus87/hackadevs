@@ -1,5 +1,5 @@
 {
-  "name": "@aeokit-webapp/web",
+  "name": "@hackadevs/web",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@aeokit-webapp/core": "workspace:*",
+    "@hackadevs/core": "workspace:*",
     "@codemirror/lang-javascript": "^6.2.5",
     "@codemirror/lang-json": "^6.0.2",
     "@codemirror/lang-python": "^6.2.1",

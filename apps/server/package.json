@@ -6,14 +6,14 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "db:generate": "node --env-file=../../.env ./node_modules/prisma/build/index.js generate",
     "db:generate:ci": "prisma generate",
     "db:push": "node --env-file=../../.env ./node_modules/prisma/build/index.js db push",
     "db:migrate": "node --env-file=../../.env ./node_modules/prisma/build/index.js migrate dev",
     "db:migrate:deploy": "node --env-file=../../.env ./node_modules/prisma/build/index.js migrate deploy",
     "db:migrate:prod": "prisma migrate deploy",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "prisma generate && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"

@@ -1,17 +1,14 @@
 # hackadevs
 
 ```text
-  ███╗   ███╗ █████╗  ██████╗██╗  ██╗ █████╗ ██████╗ ███████╗██╗   ██╗███████╗
-  ████╗ ████║██╔══██╗██╔════╝██║ ██╔╝██╔══██╗██╔══██╗██╔════╝██║   ██║██╔════╝
-  ██╔████╔██║███████║██║     █████╔╝ ███████║██║  ██║█████╗  ██║   ██║███████╗
-  ██║╚██╔╝██║██╔══██║██║     ██╔═██╗ ██╔══██║██║  ██║██╔══╝  ╚██╗ ██╔╝╚════██║
-  ██║ ╚═╝ ██║██║  ██║╚██████╗██║  ██╗██║  ██║██████╔╝███████╗ ╚████╔╝ ███████║
-  ╚═╝     ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚══════╝  ╚═══╝  ╚══════╝
+  _   _    _    ____ _  __    _    ____  _______     ______
+ | | | |  / \  / ___| |/ /   / \  |  _ \| ____\ \   / / ___|
+ | |_| | / _ \| |   | ' /   / _ \ | | | |  _|  \ \ / /\___ \
+ |  _  |/ ___ \ |___| . \  / ___ \| |_| | |___  \ V /  ___) |
+ |_| |_/_/   \_\____|_|\_\/_/   \_\____/|_____|  \_/  |____/
 
-  ┌─────────────────────────────────────────────────────────────────────────┐
-  │  gogogogo — ship the solve · earn the rep · own the streak              │
-  │  vision: fair votes, weekly prompts, momentum for builders who ship      │
-  └─────────────────────────────────────────────────────────────────────────┘
+  gogogogo — ship the solve · earn the rep · own the streak
+  vision: fair votes, weekly prompts, momentum for builders who ship
 ```
 
 **Hackadevs** is a home for developers who want momentum: weekly challenges, fair peer votes, and reputation that reflects real craft—not vanity metrics. Pick a prompt, run tests, submit, vote, climb. **Go go go.**

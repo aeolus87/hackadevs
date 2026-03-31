@@ -3,6 +3,7 @@ import { axiosInstance } from '@/utils/axios.instance'
 import { CHALLENGES } from '@/utils/api.routes'
 import { parseAxiosError } from '@/utils/axios-message'
 import type { Challenge } from '@/types/hackadevs-api.types'
+import { unwrapSuccessData } from '@/lib/api-unwrap'
 
 export function useChallenge(slug: string) {
   const [data, setData] = useState<Challenge | null>(null)
@@ -18,8 +19,8 @@ export function useChallenge(slug: string) {
     setLoading(true)
     setError(null)
     try {
-      const res = await axiosInstance.get<Challenge>(CHALLENGES.DETAIL(slug))
-      setData(res.data)
+      const res = await axiosInstance.get<unknown>(CHALLENGES.DETAIL(slug))
+      setData(unwrapSuccessData<Challenge>(res.data))
     } catch (e) {
       const { message, status } = parseAxiosError(e)
       setError(message)

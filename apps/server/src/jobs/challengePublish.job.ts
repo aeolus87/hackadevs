@@ -1,3 +1,6 @@
-export async function runChallengePublish(_now = new Date()) {
-  /* SCHEDULED → ACTIVE at Monday 09:00 UTC */
+import { runPublishScheduledChallenges } from '../modules/v1/v1.routes.js'
+import { prisma } from '../lib/prisma.js'
+
+export async function runChallengePublishJob() {
+  await runPublishScheduledChallenges(prisma)
 }

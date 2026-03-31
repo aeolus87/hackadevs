@@ -1,35 +1,52 @@
+import { useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ChallengeDetail } from '@/components/challenge-detail'
 import { DifficultyBadge } from '@/components/difficulty-badge'
 import { InlineError } from '@/components/inline-error'
 import { RatingDonut } from '@/components/rating-donut'
 import { SkeletonCard } from '@/components/skeleton-card'
-import { UserHoverCard } from '@/components/user-hover-card'
 import { useAuthUser } from '@/contexts/auth-context'
 import { useUnreadCount } from '@/hooks/notifications/useUnreadCount'
 import { useChallenge } from '@/hooks/challenges/useChallenge'
 import { useMySubmission } from '@/hooks/submissions/useMySubmission'
 import { useSubmissions } from '@/hooks/submissions/useSubmissions'
-import {
-  getChallengeBySlug,
-  mockProfileUser,
-  mockRatingDonut,
-  mockTopSolutionsMini,
-} from '@/data/mock'
 import { apiChallengeToUi } from '@/utils/map-api-challenge'
+import { getVotingState, votingPhaseLabel } from '@/utils/voting-ui'
 
 export default function ChallengeDetailPage() {
   const { slug = '' } = useParams()
   const { isAuthenticated } = useAuthUser()
   useUnreadCount()
   const { data: apiCh, loading, error, refetch } = useChallenge(slug)
-  const mockCh = getChallengeBySlug(slug)
-  const challenge = apiCh ? apiChallengeToUi(apiCh) : mockCh
+  const challenge = useMemo(() => (apiCh ? apiChallengeToUi(apiCh) : null), [apiCh])
   const challengeId = apiCh?.id ?? ''
+  const votingState =
+    apiCh?.closesAt != null
+      ? getVotingState(apiCh.closesAt, apiCh.votingSettled)
+      : ('active' as const)
+  const votingPill = apiCh?.closesAt != null ? votingPhaseLabel(votingState, apiCh.closesAt) : null
   const { data: mine } = useMySubmission(challengeId)
   const { data: subs } = useSubmissions(challengeId, { page: 1, sortBy: 'compositeScore' })
 
-  if (loading && !challenge) {
+  const submissionLangSlices = useMemo(() => {
+    const list = subs?.data ?? []
+    if (!list.length) return []
+    const byLang = new Map<string, number>()
+    for (const s of list) {
+      const k = s.language ?? 'UNK'
+      byLang.set(k, (byLang.get(k) ?? 0) + 1)
+    }
+    const total = list.length
+    const colors = ['#6366f1', '#34d399', '#fbbf24', '#f472b6', '#94a3b8']
+    let i = 0
+    return [...byLang.entries()].map(([label, n]) => ({
+      label,
+      percent: Math.round((n / total) * 100),
+      color: colors[i++ % colors.length] ?? '#94a3b8',
+    }))
+  }, [subs?.data])
+
+  if (loading && !apiCh) {
     return (
       <div className="mx-auto max-w-6xl space-y-4">
         <SkeletonCard />
@@ -37,7 +54,7 @@ export default function ChallengeDetailPage() {
     )
   }
 
-  if (error && !challenge) {
+  if (error && !apiCh) {
     return (
       <div className="mx-auto max-w-lg">
         <InlineError message={error} onRetry={() => void refetch()} />
@@ -80,7 +97,7 @@ export default function ChallengeDetailPage() {
       <div className="rounded-[16px] border border-hd-border bg-hd-indigo-surface px-4 py-6 md:px-8 md:py-8">
         <nav className="mb-4 font-mono text-[12px] text-hd-muted">
           <Link to="/feed" className="text-hd-secondary hover:text-hd-text">
-            Feed
+            Home
           </Link>
           <span className="mx-2 text-hd-muted">&gt;</span>
           <span>{challenge.category}</span>
@@ -97,9 +114,29 @@ export default function ChallengeDetailPage() {
             closes in {challenge.closesIn}
           </span>
         </div>
+        {votingPill && (
+          <div className="mt-3">
+            <span
+              className={`inline-flex rounded-full border px-3 py-1 font-mono text-[11px] ${
+                votingState === 'active'
+                  ? 'border-hd-emerald/40 bg-hd-emerald/10 text-hd-emerald'
+                  : votingState === 'voting_open'
+                    ? 'border-hd-indigo/40 bg-hd-indigo-surface text-hd-indigo-tint'
+                    : votingState === 'voting_closed'
+                      ? 'border-hd-amber/40 bg-hd-amber/10 text-hd-amber'
+                      : 'border-hd-border bg-hd-surface text-hd-muted'
+              }`}
+            >
+              {votingPill}
+            </span>
+          </div>
+        )}
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
-            to={`/challenge/${challenge.slug}/submit`}
+            to={isAuthenticated ? `/challenge/${challenge.slug}/submit` : '/login'}
+            state={
+              isAuthenticated ? undefined : { returnTo: `/challenge/${challenge.slug}/submit` }
+            }
             className="inline-flex h-11 items-center justify-center rounded-full bg-hd-indigo px-8 text-sm font-medium text-white transition-colors duration-150 ease-out hover:bg-hd-indigo-hover"
           >
             Start solving
@@ -120,64 +157,33 @@ export default function ChallengeDetailPage() {
         <aside className="w-full space-y-4 lg:sticky lg:top-24 lg:w-[40%] lg:max-w-md lg:self-start">
           <div className="rounded-[12px] border border-hd-border bg-hd-card p-5">
             <h3 className="mb-4 text-sm font-medium text-hd-text">Submission stats</h3>
-            <RatingDonut slices={mockRatingDonut} />
+            {submissionLangSlices.length > 0 ? (
+              <RatingDonut slices={submissionLangSlices} />
+            ) : (
+              <p className="text-sm text-hd-muted">Stats appear once submissions are in.</p>
+            )}
           </div>
           <div className="rounded-[12px] border border-hd-border bg-hd-card p-5">
             <h3 className="mb-3 text-sm font-medium text-hd-text">Top solutions by votes</h3>
             <ol className="space-y-3">
-              {subs?.data && subs.data.length > 0
-                ? subs.data.slice(0, 5).map((s, i) => (
-                    <li key={s.id} className="flex items-center gap-3">
-                      <span className="font-mono text-xs text-hd-muted">{i + 1}</span>
-                      <div className="min-w-0 flex-1">
-                        <Link
-                          to={`/challenge/${challenge.slug}/solutions/${s.id}`}
-                          className="truncate text-sm font-medium text-hd-text hover:text-hd-indigo-tint"
-                        >
-                          Solution · {s.user?.displayName ?? s.userId.slice(0, 8)}
-                        </Link>
-                      </div>
-                      <span className="font-mono text-xs text-hd-secondary">{s.upvoteCount}</span>
-                    </li>
-                  ))
-                : mockTopSolutionsMini.map((s, i) => {
-                    const u = mockProfileUser(s.solver.username)
-                    const hoverUser = u ?? {
-                      ...s.solver,
-                      rep: 0,
-                      topCategory: 'Backend' as const,
-                      tagline: '',
-                      tier: 'Mid' as const,
-                      selfDeclaredLevel: 'MID' as const,
-                      platformTier: 'ENGINEER' as const,
-                      streak: 0,
-                      weeklyDelta: 0,
-                      rankMovement: 0,
-                      challengesSolved: 0,
-                      rankPercentile: '',
-                      skills: {},
-                    }
-                    return (
-                      <li key={s.id} className="flex items-center gap-3">
-                        <span className="font-mono text-xs text-hd-muted">{i + 1}</span>
-                        <img
-                          src={s.solver.avatar}
-                          alt=""
-                          className="h-8 w-8 rounded-full"
-                          width={32}
-                          height={32}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <UserHoverCard user={hoverUser}>
-                            <span className="truncate text-sm font-medium text-hd-text">
-                              {s.solver.displayName}
-                            </span>
-                          </UserHoverCard>
-                        </div>
-                        <span className="font-mono text-xs text-hd-secondary">{s.votes}</span>
-                      </li>
-                    )
-                  })}
+              {subs?.data && subs.data.length > 0 ? (
+                subs.data.slice(0, 5).map((s, i) => (
+                  <li key={s.id} className="flex items-center gap-3">
+                    <span className="font-mono text-xs text-hd-muted">{i + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        to={`/challenge/${challenge.slug}/solutions/${s.id}`}
+                        className="truncate text-sm font-medium text-hd-text hover:text-hd-indigo-tint"
+                      >
+                        Solution · {s.user?.displayName ?? s.userId.slice(0, 8)}
+                      </Link>
+                    </div>
+                    <span className="font-mono text-xs text-hd-secondary">{s.upvoteCount}</span>
+                  </li>
+                ))
+              ) : (
+                <p className="text-sm text-hd-muted">No solutions to show yet.</p>
+              )}
             </ol>
           </div>
           <div className="rounded-[12px] border border-hd-border bg-hd-card p-5">

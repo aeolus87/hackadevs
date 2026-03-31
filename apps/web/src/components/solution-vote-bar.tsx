@@ -5,6 +5,7 @@ type SolutionVoteBarProps = {
   downvoteCount: number
   userVote: VoteValue | null
   canRetract: boolean
+  retractSecondsRemaining?: number | null
   busy?: boolean
   onUpvote: () => void
   onDownvote: () => void
@@ -16,6 +17,7 @@ export function SolutionVoteBar({
   downvoteCount,
   userVote,
   canRetract,
+  retractSecondsRemaining,
   busy,
   onUpvote,
   onDownvote,
@@ -57,6 +59,11 @@ export function SolutionVoteBar({
           </button>
         )}
       </div>
+      {userVote && canRetract && retractSecondsRemaining != null && retractSecondsRemaining > 0 && (
+        <p className="mt-4 text-xs text-hd-muted">
+          Retract available for {retractSecondsRemaining}s
+        </p>
+      )}
     </div>
   )
 }

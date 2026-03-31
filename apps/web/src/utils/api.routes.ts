@@ -19,6 +19,7 @@ export const AUTH = {
 export const USERS = {
   ME: () => `${V1}/users/me`,
   ME_ACTIVITY: () => `${V1}/users/me/activity`,
+  PROFILE_ACTIVITY: (username: string) => `${V1}/users/${encodeURIComponent(username)}/activity`,
   PROFILE: (username: string) => `${V1}/users/${encodeURIComponent(username)}`,
   SOLUTIONS: (username: string) => `${V1}/users/${encodeURIComponent(username)}/solutions`,
   FOLLOWERS: (username: string) => `${V1}/users/${encodeURIComponent(username)}/followers`,
@@ -34,11 +35,21 @@ export const CHALLENGES = {
   LEADERBOARD: (slug: string) => `${V1}/challenges/${encodeURIComponent(slug)}/leaderboard`,
 }
 
+export const SEARCH = (params: { q: string; limitChallenges?: number; limitUsers?: number }) => {
+  const sp = new URLSearchParams()
+  sp.set('q', params.q)
+  if (params.limitChallenges != null) sp.set('limitChallenges', String(params.limitChallenges))
+  if (params.limitUsers != null) sp.set('limitUsers', String(params.limitUsers))
+  return `${V1}/search?${sp.toString()}`
+}
+
 export const SUBMISSIONS = {
   CREATE: () => `${V1}/submissions`,
   RUN: (id: string) => `${V1}/submissions/${encodeURIComponent(id)}/run`,
   SUBMIT: (id: string) => `${V1}/submissions/${encodeURIComponent(id)}/submit`,
   GET: (id: string) => `${V1}/submissions/${encodeURIComponent(id)}`,
+  MINE_BY_CHALLENGE: (challengeId: string) =>
+    `${V1}/submissions/mine/challenge/${encodeURIComponent(challengeId)}`,
   BY_CHALLENGE: (challengeId: string) =>
     `${V1}/submissions/challenge/${encodeURIComponent(challengeId)}`,
   WITHDRAW: (id: string) => `${V1}/submissions/${encodeURIComponent(id)}`,
@@ -66,4 +77,11 @@ export const NOTIFICATIONS = {
   LIST: () => `${V1}/notifications`,
   MARK_READ: (id: string) => `${V1}/notifications/${encodeURIComponent(id)}/read`,
   MARK_ALL_READ: () => `${V1}/notifications/read-all`,
+}
+
+export const ADMIN = {
+  CHALLENGES: () => `${V1}/admin/challenges`,
+  CHALLENGE: (id: string) => `${V1}/admin/challenges/${encodeURIComponent(id)}`,
+  PUBLISH: (id: string) => `${V1}/admin/challenges/${encodeURIComponent(id)}/publish`,
+  GENERATE: () => `${V1}/admin/challenges/generate`,
 }

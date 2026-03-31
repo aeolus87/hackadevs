@@ -13,7 +13,7 @@ export type StreakTickResult = {
   missedDay: boolean
 }
 
-function startOfUtcDay(d: Date): Date {
+export function startOfUtcDay(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
 }
 
@@ -21,6 +21,28 @@ function diffUtcDays(a: Date, b: Date): number {
   const sa = startOfUtcDay(a).getTime()
   const sb = startOfUtcDay(b).getTime()
   return Math.round((sa - sb) / 86400000)
+}
+
+export function shouldIncrementStreak(lastSubmissionDate: Date | null, now: Date): boolean {
+  if (!lastSubmissionDate) return true
+  const gap = diffUtcDays(startOfUtcDay(now), startOfUtcDay(lastSubmissionDate))
+  return gap === 1
+}
+
+export function shouldResetStreak(lastSubmissionDate: Date | null, now: Date): boolean {
+  if (!lastSubmissionDate) return false
+  const gap = diffUtcDays(startOfUtcDay(now), startOfUtcDay(lastSubmissionDate))
+  return gap > 1
+}
+
+export function consumeStreakGrace(gracesRemaining: number): {
+  newGraces: number
+  graceUsed: boolean
+} {
+  if (gracesRemaining > 0) {
+    return { newGraces: gracesRemaining - 1, graceUsed: true }
+  }
+  return { newGraces: 0, graceUsed: false }
 }
 
 export function recordSubmissionStreak(input: StreakInput): {

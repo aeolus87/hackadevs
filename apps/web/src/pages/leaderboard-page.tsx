@@ -7,13 +7,16 @@ import { UserHoverCard } from '@/components/user-hover-card'
 import { useFriendsLeaderboard } from '@/hooks/leaderboard/useFriendsLeaderboard'
 import { useCategoryLeaderboard } from '@/hooks/leaderboard/useCategoryLeaderboard'
 import { useGlobalLeaderboard } from '@/hooks/leaderboard/useGlobalLeaderboard'
+import { Link } from 'react-router-dom'
 import { useAuthUser } from '@/contexts/auth-context'
 import { useMyRank } from '@/hooks/leaderboard/useMyRank'
 import { useUnreadCount } from '@/hooks/notifications/useUnreadCount'
-import { buildLeaderboard, categorySpotlight } from '@/data/mock'
+import { apiCategoryToUi, uiTabLabelToApiCategory } from '@/utils/map-api-category'
 import { apiLeaderboardEntryToRow } from '@/utils/map-leaderboard-entry'
-import { uiTabLabelToApiCategory } from '@/utils/map-api-category'
 import type { LeaderboardRow } from '@/types/hackadevs'
+import type { Category } from '@/types/hackadevs-api.types'
+
+const SPOTLIGHT_CATEGORY: Category = 'BACKEND'
 
 const categories = [
   'All',
@@ -37,7 +40,7 @@ function podiumTuple(
 }
 
 export default function LeaderboardPage() {
-  const { user: me } = useAuthUser()
+  const { user: me, isAuthenticated } = useAuthUser()
   useMyRank()
   useUnreadCount()
   const [cat, setCat] = useState<string>('All')
@@ -56,10 +59,18 @@ export default function LeaderboardPage() {
     enabled: showCat,
   })
   const friendsQ = useFriendsLeaderboard({ enabled: showFriends })
+  const spotlightQ = useCategoryLeaderboard(SPOTLIGHT_CATEGORY, {
+    page: 1,
+    limit: 5,
+    enabled: true,
+  })
 
   const { rows, loading, error, refetch, source } = useMemo(() => {
     if (showFriends) {
-      const list = friendsQ.data?.map(apiLeaderboardEntryToRow) ?? []
+      const list =
+        friendsQ.data?.map((e, i) =>
+          apiLeaderboardEntryToRow(e, { page: 1, limit: 50, index: i }),
+        ) ?? []
       return {
         rows: list,
         loading: friendsQ.loading,
@@ -69,7 +80,11 @@ export default function LeaderboardPage() {
       }
     }
     if (showCat && apiCat) {
-      const list = catQ.data?.data.map(apiLeaderboardEntryToRow) ?? []
+      const pg = catQ.data
+      const list =
+        pg?.data.map((e, i) =>
+          apiLeaderboardEntryToRow(e, { page: pg.page, limit: pg.limit, index: i }),
+        ) ?? []
       return {
         rows: list,
         loading: catQ.loading,
@@ -78,7 +93,11 @@ export default function LeaderboardPage() {
         source: 'cat' as const,
       }
     }
-    const list = globalQ.data?.data.map(apiLeaderboardEntryToRow) ?? []
+    const pg = globalQ.data
+    const list =
+      pg?.data.map((e, i) =>
+        apiLeaderboardEntryToRow(e, { page: pg.page, limit: pg.limit, index: i }),
+      ) ?? []
     return {
       rows: list,
       loading: globalQ.loading,
@@ -104,11 +123,14 @@ export default function LeaderboardPage() {
     globalQ.refetch,
   ])
 
-  const mockBoard = buildLeaderboard()
-  const displayRows = rows.length > 0 ? rows : !loading && !error ? mockBoard : []
+  const displayRows = rows
   const top3 = displayRows.slice(0, 3)
-  const podium = podiumTuple(top3)
-  const rest = displayRows.slice(3)
+  const hasFullPodium = top3.length >= 3
+  const podium = hasFullPodium
+    ? podiumTuple(top3 as [LeaderboardRow, LeaderboardRow, LeaderboardRow])
+    : null
+  const rest = hasFullPodium ? displayRows.slice(3) : displayRows
+  const tableStartRank = hasFullPodium ? 4 : 1
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-8 lg:flex-row lg:items-start">
@@ -159,9 +181,43 @@ export default function LeaderboardPage() {
             <PodiumRow rows={podium} />
           </div>
         )}
-        <div className="mt-8">
-          <LeaderboardTable rows={rest} startRank={4} highlightUsername={me?.username ?? null} />
-        </div>
+        {!loading && !error && displayRows.length === 0 && (
+          <div className="mt-8 rounded-[12px] border border-hd-border bg-hd-card p-8 text-center">
+            <p className="text-sm font-medium text-hd-text">
+              {showFriends && !isAuthenticated
+                ? 'Sign in to see friends on the leaderboard.'
+                : showFriends
+                  ? 'No one you follow is ranked yet. Follow other builders to see them here.'
+                  : 'No rankings yet. Be the first to solve a challenge and earn rep.'}
+            </p>
+            {!showFriends && (
+              <Link
+                to="/challenges"
+                className="mt-4 inline-block text-sm font-medium text-hd-indigo-tint hover:text-hd-indigo-hover"
+              >
+                Browse challenges
+              </Link>
+            )}
+            {showFriends && !isAuthenticated && (
+              <Link
+                to="/login"
+                state={{ returnTo: '/leaderboard' }}
+                className="mt-4 inline-block text-sm font-medium text-hd-indigo-tint hover:text-hd-indigo-hover"
+              >
+                Sign in
+              </Link>
+            )}
+          </div>
+        )}
+        {displayRows.length > 0 && (
+          <div className="mt-8">
+            <LeaderboardTable
+              rows={rest}
+              startRank={tableStartRank}
+              highlightUsername={me?.username ?? null}
+            />
+          </div>
+        )}
         {source === 'global' && globalQ.data?.hasMore && (
           <div className="mt-6 flex justify-center">
             <button
@@ -191,21 +247,45 @@ export default function LeaderboardPage() {
             Category spotlight
           </p>
           <p className="mt-2 text-sm font-medium text-hd-text">
-            {categorySpotlight.category} is most active this week
+            {apiCategoryToUi(SPOTLIGHT_CATEGORY)} · top rep in this category
           </p>
+          {spotlightQ.loading && (
+            <div className="mt-4 h-24 animate-pulse rounded-lg bg-[rgba(255,255,255,0.04)]" />
+          )}
+          {!spotlightQ.loading && spotlightQ.error && (
+            <p className="mt-4 text-sm text-hd-muted">{spotlightQ.error}</p>
+          )}
+          {!spotlightQ.loading &&
+            !spotlightQ.error &&
+            (spotlightQ.data?.data.length ?? 0) === 0 && (
+              <p className="mt-4 text-sm text-hd-muted">No category rankings yet.</p>
+            )}
           <ol className="mt-4 space-y-3">
-            {categorySpotlight.devs.map((d, i) => (
-              <li key={d.username} className="flex items-center gap-3">
+            {(spotlightQ.data?.data ?? []).map((e, i) => (
+              <li key={e.userId} className="flex items-center gap-3">
                 <span className="w-4 font-mono text-xs text-hd-muted">{i + 1}</span>
                 <img
-                  src={d.avatar}
+                  src={
+                    e.avatarUrl ??
+                    `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(e.username)}`
+                  }
                   alt=""
                   className="h-8 w-8 rounded-full"
                   width={32}
                   height={32}
                 />
-                <UserHoverCard user={d}>
-                  <span className="truncate text-sm font-medium text-hd-text">{d.displayName}</span>
+                <UserHoverCard
+                  user={{
+                    username: e.username,
+                    displayName: e.displayName,
+                    avatar:
+                      e.avatarUrl ??
+                      `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(e.username)}`,
+                    rep: e.totalRep,
+                    topCategory: apiCategoryToUi(SPOTLIGHT_CATEGORY),
+                  }}
+                >
+                  <span className="truncate text-sm font-medium text-hd-text">{e.displayName}</span>
                 </UserHoverCard>
               </li>
             ))}

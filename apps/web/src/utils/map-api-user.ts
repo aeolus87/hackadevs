@@ -1,5 +1,6 @@
 import type { DevUser as ApiDevUser } from '@/types/hackadevs-api.types'
 import type {
+  AvailabilityStatusUi,
   DevTier,
   DevUser as UiDevUser,
   PlatformTier,
@@ -22,7 +23,8 @@ export function apiDevUserToUi(u: ApiDevUser): UiDevUser {
   const categoryRanks: Partial<Record<ChallengeCategory, number>> = {}
   let topCategory: ChallengeCategory = 'Backend'
   let maxRep = -1
-  for (const row of u.categoryReps) {
+  const reps = Array.isArray(u.categoryReps) ? u.categoryReps : []
+  for (const row of reps) {
     const cat = apiCategoryToUi(row.category)
     if (row.rep > maxRep) {
       maxRep = row.rep
@@ -36,6 +38,7 @@ export function apiDevUserToUi(u: ApiDevUser): UiDevUser {
   const tierUi = apiTierToDevTier(u.tier)
   const platformTier = u.tier as PlatformTier
   const selfDeclaredLevel = u.selfDeclaredLevel as SelfDeclaredLevel
+  const availabilityStatus = (u.availabilityStatus ?? 'UNSPECIFIED') as AvailabilityStatusUi
   return {
     username: u.username,
     displayName: u.displayName,
@@ -48,10 +51,11 @@ export function apiDevUserToUi(u: ApiDevUser): UiDevUser {
         : '',
     tier: tierUi,
     selfDeclaredLevel,
+    availabilityStatus,
     platformTier,
     topCategory,
     streak: u.currentStreakDays,
-    weeklyDelta: u.weeklyRepDelta,
+    weeklyDelta: u.weeklyRepDelta ?? 0,
     rankMovement: 0,
     challengesSolved: 0,
     githubUrl: u.githubUrl,

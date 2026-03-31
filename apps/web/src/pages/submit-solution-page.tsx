@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { RationaleInput, type RationaleParts } from '@/components/rationale-input'
 import { SolutionEditor, type TestCaseResult } from '@/components/solution-editor'
 import { TagPill } from '@/components/tag-pill'
+import { InlineError } from '@/components/inline-error'
+import { SkeletonCard } from '@/components/skeleton-card'
 import { useAuthUser } from '@/contexts/auth-context'
 import { useToast } from '@/contexts/toast-context'
 import { useChallenge } from '@/hooks/challenges/useChallenge'
@@ -10,8 +12,8 @@ import { useMySubmission } from '@/hooks/submissions/useMySubmission'
 import { useRunTests } from '@/hooks/submissions/useRunTests'
 import { useSaveDraft } from '@/hooks/submissions/useSaveDraft'
 import { useSubmitSolution } from '@/hooks/submissions/useSubmitSolution'
-import { getChallengeBySlug } from '@/data/mock'
 import { apiChallengeToUi } from '@/utils/map-api-challenge'
+import { parseAxiosError } from '@/utils/axios-message'
 
 const suggestTags = [
   'clean-architecture',
@@ -21,22 +23,15 @@ const suggestTags = [
   'rollout-safe',
 ]
 
-const MOCK_TEST_RESULTS: TestCaseResult[] = [
-  { id: 't1', name: 'Rejects duplicate idempotency key replay', passed: true },
-  { id: 't2', name: 'Commits side effect only after durable record', passed: true },
-  { id: 't3', name: 'Survives 24h retry window (simulated)', passed: true },
-]
-
 function rationaleLength(p: RationaleParts): number {
   return `${p.approach}\n${p.tradeoffs}\n${p.scale}`.trim().length
 }
 
 export default function SubmitSolutionPage() {
-  useAuthUser()
+  const { isAuthenticated } = useAuthUser()
   const { slug = '' } = useParams()
-  const { data: apiCh } = useChallenge(slug)
-  const mockCh = getChallengeBySlug(slug)
-  const challenge = apiCh ? apiChallengeToUi(apiCh) : mockCh
+  const { data: apiCh, loading: chLoading, error: chError, refetch: refetchCh } = useChallenge(slug)
+  const challenge = useMemo(() => (apiCh ? apiChallengeToUi(apiCh) : null), [apiCh])
   const challengeId = apiCh?.id ?? ''
   const { data: mine } = useMySubmission(challengeId)
   const { mutate: saveDraft } = useSaveDraft()
@@ -70,7 +65,7 @@ export default function SubmitSolutionPage() {
   }, [mine])
 
   useEffect(() => {
-    if (!challengeId) return
+    if (!isAuthenticated || !challengeId) return
     const t = window.setTimeout(() => {
       void (async () => {
         try {
@@ -100,14 +95,64 @@ export default function SubmitSolutionPage() {
     tags,
     difficultyDots,
     saveDraft,
+    isAuthenticated,
   ])
+
+  if (!isAuthenticated) {
+    return (
+      <div className="mx-auto max-w-lg space-y-4 rounded-[16px] border border-hd-border bg-hd-card p-8">
+        <h1 className="text-xl font-medium text-hd-text">Sign in to submit</h1>
+        <p className="text-sm text-hd-secondary">
+          Saving drafts and running tests need an account. Sign in or register to continue working
+          on this challenge.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            to="/login"
+            state={{ returnTo: slug ? `/challenge/${slug}/submit` : '/feed' }}
+            className="inline-flex rounded-full bg-hd-indigo px-5 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover"
+          >
+            Sign in
+          </Link>
+          <Link
+            to="/register"
+            className="inline-flex rounded-full border border-hd-border px-5 py-2 text-sm font-medium text-hd-text hover:border-hd-border-hover"
+          >
+            Create account
+          </Link>
+        </div>
+        <Link
+          to={slug ? `/challenge/${slug}` : '/feed'}
+          className="text-sm text-hd-indigo-tint hover:underline"
+        >
+          ← Back to challenge
+        </Link>
+      </div>
+    )
+  }
+
+  if (chLoading && !apiCh) {
+    return (
+      <div className="mx-auto max-w-6xl space-y-4">
+        <SkeletonCard />
+      </div>
+    )
+  }
+
+  if (chError && !apiCh) {
+    return (
+      <div className="mx-auto max-w-lg">
+        <InlineError message={chError} onRetry={() => void refetchCh()} />
+      </div>
+    )
+  }
 
   if (!challenge) {
     return (
       <div className="mx-auto max-w-lg text-sm text-hd-secondary">
         Challenge not found.{' '}
         <Link to="/feed" className="font-medium text-hd-indigo-tint hover:text-hd-indigo-hover">
-          Feed
+          Home
         </Link>
       </div>
     )
@@ -139,37 +184,45 @@ export default function SubmitSolutionPage() {
 
   const runTests = async () => {
     if (codeEmpty) return
-    if (submissionId) {
-      try {
-        const r = await runTestsApi(submissionId)
-        const total = r.results.length
-        const passed = r.results.filter((x) => x.passed).length
-        setTestScorePercent(total ? (passed / total) * 100 : 0)
-        setTestResults(
-          r.results.map((x, i) => ({
-            id: `t${i}`,
-            name: `Test ${i + 1}`,
-            passed: x.passed,
-          })),
-        )
-        setExecutionTimeMs(r.executionTimeMs)
-        toast.push(
-          passed === total ? 'All tests passed' : 'Some tests failed',
-          passed === total ? 'success' : 'error',
-        )
-      } catch {
-        toast.push('Run failed', 'error')
-      }
+    if (!submissionId) {
+      toast.push(
+        'Save your draft first. Your work saves automatically every few seconds; run tests once a draft exists.',
+        'error',
+      )
       return
     }
-    setTestResults(MOCK_TEST_RESULTS)
-    setExecutionTimeMs(842)
-    const ok = MOCK_TEST_RESULTS.every((r) => r.passed)
-    setTestScorePercent(ok ? 100 : 40)
-    toast.push(
-      ok ? 'Tests passed (local mock — save draft for API run)' : 'Some tests failed',
-      ok ? 'success' : 'error',
-    )
+    try {
+      const r = await runTestsApi(submissionId)
+      const total = r.results.length
+      const passed = r.results.filter((x) => x.passed).length
+      setTestScorePercent(total ? (passed / total) * 100 : 0)
+      setTestResults(
+        r.results.map((x, i) => ({
+          id: `t${i}`,
+          name: `Test ${i + 1}`,
+          passed: x.passed,
+        })),
+      )
+      setExecutionTimeMs(r.executionTimeMs)
+      toast.push(
+        passed === total ? 'All tests passed' : 'Some tests failed',
+        passed === total ? 'success' : 'error',
+      )
+    } catch (e) {
+      const { message, status } = parseAxiosError(e)
+      if (
+        status === 422 ||
+        message.toLowerCase().includes('visible test') ||
+        message.toLowerCase().includes('draft runs')
+      ) {
+        toast.push(
+          'This challenge has no visible tests for draft runs. An admin needs to mark at least one case as visible in the test suite.',
+          'error',
+        )
+      } else {
+        toast.push(message || 'Run failed', 'error')
+      }
+    }
   }
 
   return (
@@ -187,10 +240,16 @@ export default function SubmitSolutionPage() {
       </div>
       <div className="grid min-h-[calc(100dvh-10rem)] gap-6 lg:grid-cols-2 lg:gap-8">
         <div className="flex min-h-[50vh] flex-col lg:min-h-[min(640px,calc(100dvh-10rem))]">
+          {challengeId && !submissionId && (
+            <p className="mb-2 text-xs text-hd-secondary">
+              Your draft saves automatically. Run tests after a draft exists (usually a few
+              seconds).
+            </p>
+          )}
           <SolutionEditor
             value={code}
             onChange={setCode}
-            runDisabled={codeEmpty}
+            runDisabled={codeEmpty || !submissionId}
             testResults={testResults}
             executionTimeMs={executionTimeMs}
             onRunTests={() => void runTests()}

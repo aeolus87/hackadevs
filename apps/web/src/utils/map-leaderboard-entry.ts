@@ -1,29 +1,44 @@
 import type { LeaderboardEntry as ApiEntry } from '@/types/hackadevs-api.types'
-import type { LeaderboardRow } from '@/types/hackadevs'
+import type { DevTier, LeaderboardRow, PlatformTier, SelfDeclaredLevel } from '@/types/hackadevs'
 import { apiCategoryToUi } from '@/utils/map-api-category'
-import type { PlatformTier, SelfDeclaredLevel } from '@/types/hackadevs'
 
 const avatarFallback = (username: string) =>
   `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(username)}`
 
-export function apiLeaderboardEntryToRow(e: ApiEntry): LeaderboardRow {
-  const u = e.user
+function apiTierToDevTier(t: ApiEntry['tier']): DevTier {
+  if (t === 'PRINCIPAL' || t === 'LEGEND') return 'Senior'
+  if (t === 'SENIOR' || t === 'STAFF') return 'Mid'
+  return 'Junior'
+}
+
+export type LeaderboardRankOpts = { page?: number; limit?: number; index?: number }
+
+export function apiLeaderboardEntryToRow(e: ApiEntry, opts?: LeaderboardRankOpts): LeaderboardRow {
+  const page = opts?.page ?? 1
+  const limit = opts?.limit ?? 50
+  const idx = opts?.index ?? 0
+  const rank = e.categoryRank ?? e.globalRank ?? (page - 1) * limit + idx + 1
+  const username = e.username
+  const platformTier = e.tier as PlatformTier
   return {
-    rank: e.rank,
-    username: u.username,
-    displayName: u.displayName,
-    avatar: u.avatarUrl ?? avatarFallback(u.username),
+    rank,
+    username,
+    displayName: e.displayName,
+    avatar: e.avatarUrl ?? avatarFallback(username),
     tagline: '',
-    rep: u.totalRep,
-    rankPercentile: '',
-    tier: 'Mid',
+    rep: e.totalRep,
+    rankPercentile:
+      e.globalRank != null && e.globalRank > 0
+        ? `Top ${Math.min(99, Math.round(100 / Math.sqrt(e.globalRank)))}%`
+        : '',
+    tier: apiTierToDevTier(e.tier),
     selfDeclaredLevel: 'MID' as SelfDeclaredLevel,
-    platformTier: 'ENGINEER' as PlatformTier,
-    topCategory: apiCategoryToUi(e.bestCategory),
-    streak: 0,
-    weeklyDelta: e.weeklyRankDelta,
+    platformTier,
+    topCategory: e.bestCategory != null ? apiCategoryToUi(e.bestCategory) : 'Backend',
+    streak: e.currentStreakDays,
+    weeklyDelta: e.weeklyRepDelta,
     rankMovement: 0,
-    challengesSolved: e.challengesSolved,
+    challengesSolved: 0,
     skills: {},
   }
 }

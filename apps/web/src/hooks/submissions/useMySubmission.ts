@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/auth-context'
+import { unwrapSuccessData } from '@/lib/api-unwrap'
 import { axiosInstance } from '@/utils/axios.instance'
 import { SUBMISSIONS } from '@/utils/api.routes'
 import { parseAxiosError } from '@/utils/axios-message'
@@ -20,12 +21,8 @@ export function useMySubmission(challengeId: string) {
     setLoading(true)
     setError(null)
     try {
-      const res = await axiosInstance.get(SUBMISSIONS.BY_CHALLENGE(challengeId), {
-        params: { page: 1, limit: 100 },
-      })
-      const raw = res.data as { items?: Submission[]; data?: Submission[] }
-      const list = raw.items ?? raw.data ?? []
-      const mine = list.find((s) => s.userId === user.id) ?? null
+      const res = await axiosInstance.get(SUBMISSIONS.MINE_BY_CHALLENGE(challengeId))
+      const mine = unwrapSuccessData<Submission | null>(res.data)
       setData(mine ?? null)
     } catch (e) {
       setError(parseAxiosError(e).message)

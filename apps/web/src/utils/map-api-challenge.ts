@@ -12,6 +12,9 @@ const DIFF_TO_UI: Record<ApiDifficulty, Difficulty> = {
   LEGENDARY: 'Legendary',
 }
 
+const HACKADEVS_AVATAR =
+  'https://api.dicebear.com/7.x/shapes/svg?seed=hackadevs&backgroundColor=6366f1'
+
 function closesInLabel(closesAt: string): string {
   const end = new Date(closesAt).getTime()
   const t = end - Date.now()
@@ -23,6 +26,7 @@ function closesInLabel(closesAt: string): string {
 }
 
 export function apiChallengeToUi(c: ApiChallenge): UiChallenge {
+  const sponsor = c.companySource?.trim()
   return {
     slug: c.slug,
     title: c.title,
@@ -33,8 +37,11 @@ export function apiChallengeToUi(c: ApiChallenge): UiChallenge {
     closesIn: closesInLabel(c.closesAt),
     submissionCount: c.submissionCount,
     voteRate: 0,
-    company: c.companySource ? { name: c.companySource } : undefined,
-    postedBy: { name: 'HackaDevs', avatar: '' },
+    company: sponsor ? { name: sponsor } : undefined,
+    postedBy: {
+      name: sponsor ?? 'HackaDevs',
+      avatar: HACKADEVS_AVATAR,
+    },
     constraints: c.constraints,
     bonusObjectives: c.bonusObjective ? [c.bonusObjective] : undefined,
     discussCount: 0,

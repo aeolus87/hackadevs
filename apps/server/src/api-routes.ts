@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { Type } from '@sinclair/typebox'
+import type { ServerEnv } from '@hackadevs/config'
 import { createV1Routes } from './modules/v1/v1.routes.js'
 
 const HealthResponseSchema = Type.Object({
@@ -9,6 +10,7 @@ const HealthResponseSchema = Type.Object({
 
 export type ApiRouteOpts = {
   jwtSecret: string
+  env: ServerEnv
 }
 
 export const apiRoutes: FastifyPluginAsync<ApiRouteOpts> = async (fastify, opts) => {
@@ -29,5 +31,5 @@ export const apiRoutes: FastifyPluginAsync<ApiRouteOpts> = async (fastify, opts)
     }),
   )
 
-  await fastify.register(createV1Routes(jwtSecret), { prefix: '/v1' })
+  await fastify.register(createV1Routes({ jwtSecret, env: opts.env }), { prefix: '/v1' })
 }

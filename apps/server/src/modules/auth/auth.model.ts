@@ -28,6 +28,6 @@ export async function createUser(
       passwordHash: data.passwordHash,
       displayName: data.displayName,
     },
-    select: { id: true, username: true, displayName: true, email: true },
+    select: { id: true },
   })
 }

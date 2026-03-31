@@ -34,5 +34,35 @@ export function createGitHubClient(accessToken: string) {
     return (await res.json()) as unknown
   }
 
-  return { getViewerLogin, getContributionGraphSummary }
+  async function getContributionGraph(fromIso: string, toIso: string) {
+    const { login } = await getViewerLogin()
+    const raw = await getContributionGraphSummary(login, fromIso, toIso)
+    const body = raw as {
+      data?: {
+        user?: {
+          contributionsCollection?: {
+            contributionCalendar?: {
+              totalContributions: number
+              weeks: { contributionDays: { date: string; contributionCount: number }[] }[]
+            }
+          }
+        }
+      }
+    }
+    const cal = body.data?.user?.contributionsCollection?.contributionCalendar
+    if (!cal) {
+      return { totalContributions: 0, weeks: [] as { days: { date: string; count: number }[] }[] }
+    }
+    return {
+      totalContributions: cal.totalContributions,
+      weeks: (cal.weeks ?? []).map((w) => ({
+        days: (w.contributionDays ?? []).map((d) => ({
+          date: d.date,
+          count: d.contributionCount,
+        })),
+      })),
+    }
+  }
+
+  return { getViewerLogin, getContributionGraphSummary, getContributionGraph }
 }

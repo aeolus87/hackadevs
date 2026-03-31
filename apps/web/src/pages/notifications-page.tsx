@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+import { useAuthUser } from '@/contexts/auth-context'
 import { useNotifications } from '@/hooks/notifications/useNotifications'
 import { useMarkRead } from '@/hooks/notifications/useMarkRead'
 import { useMarkAllRead } from '@/hooks/notifications/useMarkAllRead'
@@ -5,9 +7,28 @@ import { InlineError } from '@/components/inline-error'
 import { SkeletonCard } from '@/components/skeleton-card'
 
 export default function NotificationsPage() {
+  const { isAuthenticated } = useAuthUser()
   const { data, loading, error, refetch } = useNotifications({ page: 1, limit: 50 })
   const { mutate: markRead } = useMarkRead(refetch)
   const { mutate: markAll, loading: allBusy } = useMarkAllRead(refetch)
+
+  if (!isAuthenticated) {
+    return (
+      <div className="mx-auto max-w-lg space-y-4 rounded-[16px] border border-hd-border bg-hd-card p-8">
+        <h1 className="text-xl font-medium text-hd-text">Notifications</h1>
+        <p className="text-sm text-hd-secondary">
+          Sign in to see challenge updates, streaks, and mentions.
+        </p>
+        <Link
+          to="/login"
+          state={{ returnTo: '/notifications' }}
+          className="inline-flex rounded-full bg-hd-indigo px-5 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover"
+        >
+          Sign in
+        </Link>
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">

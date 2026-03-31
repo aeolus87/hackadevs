@@ -4,6 +4,7 @@ import { axiosInstance } from '@/utils/axios.instance'
 import { LEADERBOARD } from '@/utils/api.routes'
 import { parseAxiosError } from '@/utils/axios-message'
 import type { Category } from '@/types/hackadevs-api.types'
+import { unwrapSuccessData } from '@/lib/api-unwrap'
 
 export type MyRankResponse = {
   globalRank: number
@@ -27,8 +28,8 @@ export function useMyRank() {
     setLoading(true)
     setError(null)
     try {
-      const res = await axiosInstance.get<MyRankResponse>(LEADERBOARD.MY_RANK())
-      setData(res.data)
+      const res = await axiosInstance.get<unknown>(LEADERBOARD.MY_RANK())
+      setData(unwrapSuccessData<MyRankResponse>(res.data))
     } catch (e) {
       setError(parseAxiosError(e).message)
       setData(null)

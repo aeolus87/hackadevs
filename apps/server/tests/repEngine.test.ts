@@ -1,50 +1,86 @@
 import { describe, it, expect } from 'vitest'
 import {
-  computeRepAwardTotal,
-  difficultyRepBase,
-  rankExtraFromBase,
-  repVoteWeight,
-  speedBonusAmount,
-  testRepBonus,
-  rationaleRepBonus,
+  calculateSubmissionRep,
+  calculateWeightedVoteScore,
+  getTierFromRep,
+  getDecayAmount,
 } from '../src/utils/repEngine.js'
 
 describe('repEngine', () => {
-  it('Hard, rank 2, 36h into 100h window, 100% tests, rationale 88, streak 0 totals 810', () => {
-    const total = computeRepAwardTotal({
+  it('HARD + rank 2 + 36h + 100% tests + rationale 88 + streak 0 → 795', () => {
+    const total = calculateSubmissionRep({
       difficulty: 'HARD',
-      finalRank: 2,
-      testScorePercent: 100,
+      rank: 2,
+      submittedAt: new Date('2026-03-02T12:00:00Z'),
+      opensAt: new Date('2026-03-01T00:00:00Z'),
+      testScore: 100,
       rationaleScore: 88,
-      hoursAfterOpen: 36,
-      challengeWindowHours: 100,
       streakDays: 0,
     })
-    expect(total).toBe(810)
+    expect(total).toBe(795)
   })
 
-  it('difficultyRepBase HARD is 200', () => {
-    expect(difficultyRepBase('HARD')).toBe(200)
+  it('BEGINNER + rank 1 + 12h + 80% tests + rationale 92 → 194', () => {
+    const total = calculateSubmissionRep({
+      difficulty: 'BEGINNER',
+      rank: 1,
+      submittedAt: new Date('2026-03-01T12:00:00Z'),
+      opensAt: new Date('2026-03-01T00:00:00Z'),
+      testScore: 80,
+      rationaleScore: 92,
+      streakDays: 0,
+    })
+    expect(total).toBe(194)
   })
 
-  it('rankExtraFromBase for rank 2 is 50 when base is 200', () => {
-    expect(rankExtraFromBase(200, 2)).toBe(50)
+  it('LEGENDARY + rank 1 + 6h + 100% + rationale 95 → 2210', () => {
+    const total = calculateSubmissionRep({
+      difficulty: 'LEGENDARY',
+      rank: 1,
+      submittedAt: new Date('2026-03-01T06:00:00Z'),
+      opensAt: new Date('2026-03-01T00:00:00Z'),
+      testScore: 100,
+      rationaleScore: 95,
+      streakDays: 0,
+    })
+    expect(total).toBe(2210)
   })
 
-  it('speedBonus for 36/100 window uses (1-ratio)*150', () => {
-    expect(speedBonusAmount(36, 100)).toBe(96)
+  it('getTierFromRep boundaries', () => {
+    expect(getTierFromRep(0)).toBe('NOVICE')
+    expect(getTierFromRep(499)).toBe('NOVICE')
+    expect(getTierFromRep(500)).toBe('APPRENTICE')
+    expect(getTierFromRep(200000)).toBe('LEGEND')
   })
 
-  it('testRepBonus scales percentage by 2', () => {
-    expect(testRepBonus(100)).toBe(200)
+  it('getDecayAmount', () => {
+    expect(getDecayAmount(10000, 2)).toBe(100)
   })
 
-  it('rationaleRepBonus scales by 3', () => {
-    expect(rationaleRepBonus(88)).toBe(264)
+  it('calculateWeightedVoteScore uses neutral band when fewer than 5 votes', () => {
+    const r = calculateWeightedVoteScore([
+      { value: 'UP', voterRepAtTime: 2000 },
+      { value: 'UP', voterRepAtTime: 100 },
+    ])
+    expect(r.voteScore).toBe(50)
+    expect(r.upvoteCount).toBe(2)
   })
 
-  it('repVoteWeight is 1.5 when rep > 1000', () => {
-    expect(repVoteWeight(1001)).toBe(1.5)
-    expect(repVoteWeight(1000)).toBe(1)
+  it('calculateWeightedVoteScore weights high-rep upvotes more', () => {
+    const lowOnly = calculateWeightedVoteScore([
+      { value: 'UP', voterRepAtTime: 100 },
+      { value: 'UP', voterRepAtTime: 200 },
+      { value: 'DOWN', voterRepAtTime: 300 },
+      { value: 'UP', voterRepAtTime: 400 },
+      { value: 'DOWN', voterRepAtTime: 500 },
+    ])
+    const withHeavy = calculateWeightedVoteScore([
+      { value: 'UP', voterRepAtTime: 100 },
+      { value: 'UP', voterRepAtTime: 200 },
+      { value: 'DOWN', voterRepAtTime: 300 },
+      { value: 'UP', voterRepAtTime: 400 },
+      { value: 'UP', voterRepAtTime: 5000 },
+    ])
+    expect(withHeavy.voteScore).toBeGreaterThan(lowOnly.voteScore)
   })
 })

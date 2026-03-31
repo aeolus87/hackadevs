@@ -43,7 +43,9 @@ export function ChallengeCard({ challenge }: { challenge: Challenge }) {
           <span className="h-1.5 w-1.5 rounded-full bg-hd-emerald" aria-hidden />
           {challenge.submissionCount} submissions
         </span>
-        <span className="font-mono text-[12px]">{challenge.voteRate}% upvoted</span>
+        {challenge.voteRate > 0 ? (
+          <span className="font-mono text-[12px]">{challenge.voteRate}% upvoted</span>
+        ) : null}
         <span className="ml-auto flex items-center gap-2">
           <img
             src={challenge.postedBy.avatar}

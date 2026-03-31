@@ -5,25 +5,49 @@ import { CategoryTabBar } from '@/components/category-tab-bar'
 import { InlineError } from '@/components/inline-error'
 import { SkeletonCard } from '@/components/skeleton-card'
 import { StreakHeatmap } from '@/components/streak-heatmap'
+import { useAuthUser } from '@/contexts/auth-context'
 import { useActiveChallenges } from '@/hooks/challenges/useActiveChallenges'
 import { useChallenges } from '@/hooks/challenges/useChallenges'
+import { useGlobalLeaderboard } from '@/hooks/leaderboard/useGlobalLeaderboard'
 import { useMyRank } from '@/hooks/leaderboard/useMyRank'
 import { useUnreadCount } from '@/hooks/notifications/useUnreadCount'
-import { mockTopSolversWeek, streakHeatmapDays, weekTheme } from '@/data/mock'
+import { useMe } from '@/hooks/users/useMe'
+import { useUserSolutions } from '@/hooks/users/useUserSolutions'
 import { apiChallengeToUi } from '@/utils/map-api-challenge'
 import type { Challenge as UiChallenge } from '@/types/hackadevs'
+import type { Category } from '@/types/hackadevs-api.types'
 
 const filters = ['This week', 'Trending', 'My tags', 'Beginner'] as const
 
+const weekTheme = {
+  title: 'Cold start',
+  body: 'Warmup challenges are live first — grab an easy one, then level up.',
+}
+
 export default function FeedPage() {
   const { data: myRank } = useMyRank()
+  const { user, isAuthenticated } = useAuthUser()
+  useMe()
   useUnreadCount()
   const [filter, setFilter] = useState<(typeof filters)[number]>('This week')
 
+  const { data: mySolutions } = useUserSolutions(user?.username ?? '', { page: 1 })
+
+  const myCategories = useMemo(() => {
+    const s = new Set<Category>()
+    for (const sub of mySolutions?.data ?? []) {
+      if (sub.challenge?.category) s.add(sub.challenge.category)
+    }
+    return [...s]
+  }, [mySolutions])
+
   const listParams = useMemo(() => {
-    if (filter === 'Beginner') return { difficulty: 'BEGINNER' as const, page: 1 }
-    if (filter === 'This week') return { status: 'ACTIVE' as const, page: 1 }
-    return { page: 1 }
+    const base = { page: 1, limit: 50 as const }
+    if (filter === 'Beginner')
+      return { ...base, difficulty: 'BEGINNER' as const, status: 'ACTIVE' as const }
+    if (filter === 'This week' || filter === 'Trending' || filter === 'My tags')
+      return { ...base, status: 'ACTIVE' as const }
+    return { ...base, status: 'ACTIVE' as const }
   }, [filter])
 
   const {
@@ -33,16 +57,41 @@ export default function FeedPage() {
     refetch: refetchList,
   } = useChallenges(listParams)
   const { data: activeList, loading: activeLoading } = useActiveChallenges()
+  const { data: topWeekBoard, loading: topWeekLoading } = useGlobalLeaderboard({
+    page: 1,
+    limit: 25,
+    enabled: true,
+  })
 
   const cards: UiChallenge[] = useMemo(() => {
     if (!listData?.data?.length) return []
-    return listData.data.map((c) => apiChallengeToUi(c))
-  }, [listData])
+    let rows = listData.data
+    if (filter === 'Trending') {
+      rows = [...rows].sort((a, b) => b.submissionCount - a.submissionCount)
+    }
+    if (filter === 'My tags') {
+      if (!isAuthenticated || myCategories.length === 0) rows = []
+      else rows = rows.filter((c) => myCategories.includes(c.category))
+    }
+    return rows.map((c) => apiChallengeToUi(c))
+  }, [listData, filter, myCategories, isAuthenticated])
 
   const weekChallenges = useMemo(() => {
     if (!activeList?.length) return []
     return activeList.slice(0, 3).map((c) => apiChallengeToUi(c))
   }, [activeList])
+
+  const topByWeekly = useMemo(() => {
+    const rows = topWeekBoard?.data ?? []
+    return [...rows].sort((a, b) => b.weeklyRepDelta - a.weeklyRepDelta).slice(0, 5)
+  }, [topWeekBoard])
+
+  const heatmapDays = useMemo(() => {
+    const n = user?.currentStreakDays ?? 0
+    const len = 20
+    const on = Math.min(n, len)
+    return Array.from({ length: len }, (_, i) => i >= len - on)
+  }, [user?.currentStreakDays])
 
   return (
     <div
@@ -50,6 +99,15 @@ export default function FeedPage() {
       data-testid="feed-root"
     >
       <div className="min-w-0 flex-1 lg:max-w-[65%]">
+        <div className="mb-6">
+          <h1 className="text-xl font-medium text-hd-text">Home</h1>
+          <p className="mt-1 text-sm text-hd-secondary">
+            Streak, weekly rep, and curated discovery — not the full catalog by category.
+          </p>
+        </div>
+        <p className="mb-2 font-mono text-[11px] uppercase tracking-wide text-hd-muted">
+          Discovery
+        </p>
         <CategoryTabBar
           tabs={[...filters]}
           value={filter}
@@ -95,7 +153,7 @@ export default function FeedPage() {
               {myRank?.weeklyDelta != null ? `${myRank.weeklyDelta} weekly rep` : 'Your streak'}
             </span>
           </div>
-          <StreakHeatmap days={streakHeatmapDays} />
+          <StreakHeatmap days={heatmapDays} />
         </div>
         <div className="rounded-[12px] border border-hd-border bg-hd-card p-5">
           <h3 className="mb-3 text-sm font-medium text-hd-text">Active challenges</h3>
@@ -118,19 +176,28 @@ export default function FeedPage() {
         </div>
         <div className="rounded-[12px] border border-hd-border bg-hd-card p-5">
           <h3 className="mb-3 text-sm font-medium text-hd-text">Top solvers this week</h3>
+          {topWeekLoading && <SkeletonCard />}
+          {!topWeekLoading && topByWeekly.length === 0 && (
+            <p className="text-sm text-hd-muted">No weekly rep data yet.</p>
+          )}
           <ul className="space-y-3">
-            {mockTopSolversWeek.map((s) => (
-              <li key={s.user.username} className="flex items-center gap-3">
+            {topByWeekly.map((e) => (
+              <li key={e.userId} className="flex items-center gap-3">
                 <img
-                  src={s.user.avatar}
+                  src={
+                    e.avatarUrl ??
+                    `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(e.username)}`
+                  }
                   alt=""
                   className="h-8 w-8 rounded-full"
                   width={32}
                   height={32}
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-hd-text">{s.user.displayName}</p>
-                  <p className="font-mono text-[11px] text-hd-emerald">+{s.delta} rep this week</p>
+                  <p className="truncate text-sm font-medium text-hd-text">{e.displayName}</p>
+                  <p className="font-mono text-[11px] text-hd-emerald">
+                    +{e.weeklyRepDelta} rep this week
+                  </p>
                 </div>
               </li>
             ))}

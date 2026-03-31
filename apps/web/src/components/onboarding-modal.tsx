@@ -1,15 +1,29 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuthUser } from '@/contexts/auth-context'
 import { useActiveChallenges } from '@/hooks/challenges/useActiveChallenges'
 import { useUpdateProfile } from '@/hooks/users/useUpdateProfile'
-import { mockChallenges } from '@/data/mock'
 import { apiChallengeToUi } from '@/utils/map-api-challenge'
+import type { Challenge as UiChallenge } from '@/types/hackadevs'
+import type { Category } from '@/types/hackadevs-api.types'
 
 const STACK = ['Backend', 'Frontend', 'Systems', 'Data', 'Security', 'DevOps', 'ML'] as const
 
+const STACK_TO_CATEGORY: Record<string, Category> = {
+  Backend: 'BACKEND',
+  Frontend: 'FRONTEND',
+  Systems: 'SYSTEM_DESIGN',
+  Data: 'DATA_ENGINEERING',
+  Security: 'SECURITY',
+  DevOps: 'DEVOPS',
+  ML: 'ML_OPS',
+}
+
 const STORAGE_KEY = 'hackadevs-onboarding-done'
+const CATEGORIES_PREF_KEY = 'hackadevs.onboarding.categories'
 
 export function OnboardingModal() {
+  const { isAuthenticated } = useAuthUser()
   const { mutate: updateProfile } = useUpdateProfile()
   const { data: activeChallenges } = useActiveChallenges()
   const [done, setDone] = useState(() => {
@@ -39,6 +53,7 @@ export function OnboardingModal() {
   }
 
   if (done) return null
+  if (!isAuthenticated) return null
 
   const toggleTag = (t: string) => {
     setTags((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]))
@@ -48,10 +63,27 @@ export function OnboardingModal() {
     if (username.trim().length >= 3) setUsernameOk(true)
   }
 
-  const tailored =
-    activeChallenges && activeChallenges.length > 0
-      ? activeChallenges.slice(0, 3).map((c) => apiChallengeToUi(c))
-      : mockChallenges.slice(0, 3)
+  const prefCategories = useMemo((): Category[] => {
+    if (step < 2) return []
+    try {
+      const raw = localStorage.getItem(CATEGORIES_PREF_KEY)
+      if (!raw) return []
+      const p = JSON.parse(raw) as unknown
+      return Array.isArray(p) ? (p as Category[]) : []
+    } catch {
+      return []
+    }
+  }, [step])
+
+  const tailored = useMemo((): UiChallenge[] => {
+    if (!activeChallenges?.length) return []
+    let list = activeChallenges
+    if (prefCategories.length > 0) {
+      const f = list.filter((c) => prefCategories.includes(c.category))
+      if (f.length > 0) list = f
+    }
+    return list.slice(0, 3).map((c) => apiChallengeToUi(c))
+  }, [activeChallenges, prefCategories])
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4">
@@ -87,7 +119,14 @@ export function OnboardingModal() {
             </div>
             <button
               type="button"
-              onClick={() => setStep(1)}
+              onClick={() => {
+                try {
+                  localStorage.setItem(CATEGORIES_PREF_KEY, JSON.stringify([]))
+                } catch {
+                  /* ignore */
+                }
+                setStep(1)
+              }}
               className="mt-6 text-sm text-hd-muted underline-offset-2 hover:text-hd-secondary hover:underline"
             >
               Skip for now
@@ -95,7 +134,17 @@ export function OnboardingModal() {
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setStep(1)}
+                onClick={() => {
+                  const mapped = tags
+                    .map((t) => STACK_TO_CATEGORY[t])
+                    .filter((x): x is Category => x != null)
+                  try {
+                    localStorage.setItem(CATEGORIES_PREF_KEY, JSON.stringify(mapped))
+                  } catch {
+                    /* ignore */
+                  }
+                  setStep(1)
+                }}
                 className="rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white transition-colors duration-150 ease-out hover:bg-hd-indigo-hover"
               >
                 Continue
@@ -203,18 +252,27 @@ export function OnboardingModal() {
               Pick one to start. You can change later.
             </p>
             <div className="mt-4 space-y-3">
-              {tailored.map((c) => (
-                <div key={c.slug} className="rounded-[12px] border border-hd-border bg-hd-card p-3">
-                  <p className="text-sm font-medium text-hd-text">{c.title}</p>
-                  <Link
-                    to={`/challenge/${c.slug}`}
-                    onClick={finish}
-                    className="mt-2 inline-flex rounded-full bg-hd-indigo px-3 py-1.5 text-xs font-medium text-white hover:bg-hd-indigo-hover"
+              {tailored.length === 0 ? (
+                <p className="text-sm text-hd-muted">
+                  No active challenges right now. Head to the feed when they go live.
+                </p>
+              ) : (
+                tailored.map((c) => (
+                  <div
+                    key={c.slug}
+                    className="rounded-[12px] border border-hd-border bg-hd-card p-3"
                   >
-                    Start with this one
-                  </Link>
-                </div>
-              ))}
+                    <p className="text-sm font-medium text-hd-text">{c.title}</p>
+                    <Link
+                      to={`/challenge/${c.slug}`}
+                      onClick={finish}
+                      className="mt-2 inline-flex rounded-full bg-hd-indigo px-3 py-1.5 text-xs font-medium text-white hover:bg-hd-indigo-hover"
+                    >
+                      Start with this one
+                    </Link>
+                  </div>
+                ))
+              )}
             </div>
             <div className="mt-6 flex justify-between">
               <button

@@ -1,7 +1,8 @@
 import type { FastifyRequest } from 'fastify'
+import type { UserRole } from '@prisma/client'
 import jwt from 'jsonwebtoken'
 
-export type JwtUser = { sub: string; username: string }
+export type JwtUser = { sub: string; username: string; role?: UserRole }
 
 export function parseBearer(req: FastifyRequest, secret: string): JwtUser | null {
   const h = req.headers.authorization
@@ -23,17 +24,18 @@ declare module 'fastify' {
 }
 
 export function requireAuth(secret: string) {
-  return (
-    req: FastifyRequest,
-    reply: import('fastify').FastifyReply,
-    done: (err?: Error) => void,
-  ) => {
+  return async (req: FastifyRequest, reply: import('fastify').FastifyReply) => {
     const u = parseBearer(req, secret)
     if (!u) {
-      reply.code(401).send({ error: 'unauthorized' })
-      return
+      return reply.code(401).send({ success: false, message: 'Unauthorized' })
     }
     req.jwtUser = u
-    done()
+  }
+}
+
+export function optionalAuth(secret: string) {
+  return async (req: FastifyRequest) => {
+    const u = parseBearer(req, secret)
+    if (u) req.jwtUser = u
   }
 }

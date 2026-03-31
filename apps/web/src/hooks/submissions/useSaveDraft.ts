@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { unwrapSuccessData } from '@/lib/api-unwrap'
 import { axiosInstance } from '@/utils/axios.instance'
 import { SUBMISSIONS } from '@/utils/api.routes'
 import { parseAxiosError } from '@/utils/axios-message'
@@ -23,8 +24,8 @@ export function useSaveDraft() {
     setLoading(true)
     setError(null)
     try {
-      const res = await axiosInstance.post<Submission>(SUBMISSIONS.CREATE(), payload)
-      return res.data
+      const res = await axiosInstance.post(SUBMISSIONS.CREATE(), payload)
+      return unwrapSuccessData<Submission>(res.data)
     } catch (e) {
       const { message } = parseAxiosError(e)
       setError(message)

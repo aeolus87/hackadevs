@@ -1,27 +1,37 @@
-export type Judge0Status = {
-  id: number
-  description?: string
+import type { SubmissionLanguage } from '@prisma/client'
+
+const LANG_MAP: Record<SubmissionLanguage, number> = {
+  JS: 63,
+  TS: 74,
+  PYTHON: 71,
+  GO: 60,
+  RUST: 73,
+  JAVA: 62,
+  CPP: 54,
+  CSHARP: 51,
+  RUBY: 72,
 }
 
-export type Judge0Result = {
-  stdout?: string | null
-  stderr?: string | null
-  compile_output?: string | null
-  message?: string | null
-  time?: string | null
-  memory?: number | null
-  status: Judge0Status
-}
-
-export type RunCodeOptions = {
-  sourceCode: string
-  languageId: number
-  stdin?: string
-}
-
-const DEFAULT_LIMITS = {
+const DEFAULT_BODY = {
   cpu_time_limit: 5,
   memory_limit: 262144,
+}
+
+export type Judge0PollResult = {
+  statusId: number
+  stdout: string | null
+  stderr: string | null
+  time: string | null
+  memory: number | null
+  compileOutput: string | null
+}
+
+export type RunWithPollingResult = {
+  passed: boolean
+  stdout: string | null
+  stderr: string | null
+  executionTimeMs: number
+  memoryUsedMb: number
 }
 
 export function createJudge0Client(apiUrl: string, apiKey?: string) {
@@ -31,46 +41,87 @@ export function createJudge0Client(apiUrl: string, apiKey?: string) {
     Accept: 'application/json',
   }
   if (apiKey) {
-    headers.Authorization = `Bearer ${apiKey}`
+    headers['X-Auth-Token'] = apiKey
   }
 
-  async function createSubmission(body: Record<string, unknown>) {
-    const res = await fetch(`${base}/submissions?base64_encoded=false`, {
+  async function runCode(params: {
+    code: string
+    language: SubmissionLanguage
+    stdin?: string
+    expectedOutput?: string
+  }): Promise<string> {
+    const res = await fetch(`${base}/submissions?base64_encoded=false&wait=false`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ ...body, ...DEFAULT_LIMITS }),
+      body: JSON.stringify({
+        source_code: params.code,
+        language_id: LANG_MAP[params.language],
+        stdin: params.stdin ?? '',
+        expected_output: params.expectedOutput,
+        ...DEFAULT_BODY,
+      }),
     })
     if (!res.ok) throw new Error(`Judge0 submit failed: ${res.status}`)
-    return (await res.json()) as { token: string }
+    const j = (await res.json()) as { token: string }
+    return j.token
   }
 
-  async function getSubmission(token: string): Promise<Judge0Result> {
-    const res = await fetch(`${base}/submissions/${token}?base64_encoded=false`, {
-      headers,
-    })
+  async function getResult(token: string): Promise<Judge0PollResult> {
+    const res = await fetch(
+      `${base}/submissions/${token}?base64_encoded=false&fields=status,stdout,stderr,time,memory,compile_output`,
+      { headers },
+    )
     if (!res.ok) throw new Error(`Judge0 poll failed: ${res.status}`)
-    return (await res.json()) as Judge0Result
-  }
-
-  async function pollUntilDone(token: string, opts?: { maxAttempts?: number; delayMs?: number }) {
-    const max = opts?.maxAttempts ?? 40
-    const delay = opts?.delayMs ?? 250
-    for (let i = 0; i < max; i++) {
-      const s = await getSubmission(token)
-      if (s.status.id >= 3) return s
-      await new Promise((r) => setTimeout(r, delay))
+    const j = (await res.json()) as {
+      status?: { id: number }
+      stdout?: string | null
+      stderr?: string | null
+      time?: string | null
+      memory?: number | null
+      compile_output?: string | null
     }
-    throw new Error('Judge0 poll timeout')
+    return {
+      statusId: j.status?.id ?? 0,
+      stdout: j.stdout ?? null,
+      stderr: j.stderr ?? null,
+      time: j.time ?? null,
+      memory: j.memory ?? null,
+      compileOutput: j.compile_output ?? null,
+    }
   }
 
-  return {
-    async runSingle(opts: RunCodeOptions) {
-      const { token } = await createSubmission({
-        source_code: opts.sourceCode,
-        language_id: opts.languageId,
-        stdin: opts.stdin ?? '',
-      })
-      return pollUntilDone(token)
-    },
+  async function runWithPolling(params: {
+    code: string
+    language: SubmissionLanguage
+    stdin?: string
+    expectedOutput?: string
+  }): Promise<RunWithPollingResult> {
+    const token = await runCode(params)
+    let last: Judge0PollResult | null = null
+    for (let i = 0; i < 10; i++) {
+      last = await getResult(token)
+      if (last.statusId >= 3) break
+      await new Promise((r) => setTimeout(r, 800))
+    }
+    if (!last) {
+      return {
+        passed: false,
+        stdout: null,
+        stderr: null,
+        executionTimeMs: 0,
+        memoryUsedMb: 0,
+      }
+    }
+    const timeSec = last.time ? Number.parseFloat(last.time) : 0
+    const memKb = last.memory ?? 0
+    return {
+      passed: last.statusId === 3,
+      stdout: last.stdout,
+      stderr: last.stderr,
+      executionTimeMs: Number.isFinite(timeSec) ? Math.round(timeSec * 1000) : 0,
+      memoryUsedMb: memKb / 1024,
+    }
   }
+
+  return { runCode, getResult, runWithPolling }
 }

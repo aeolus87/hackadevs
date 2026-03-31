@@ -48,7 +48,7 @@ export const mockCurrentUser: DevUser = {
 
 export const mockChallenges: Challenge[] = [
   {
-    slug: 'stripe-idempotency-ledger',
+    slug: 'idempotency-keys-ledger-scale',
     title: 'Idempotency keys at ledger scale',
     description:
       'Design how you would make payment retries safe when your ledger spans regions and partial failures are normal.',
@@ -340,7 +340,7 @@ export const mockProfileUser = (username: string): DevUser | undefined => {
 
 export const mockPinned: PinnedSolution[] = [
   {
-    challengeSlug: 'stripe-idempotency-ledger',
+    challengeSlug: 'idempotency-keys-ledger-scale',
     challengeTitle: 'Idempotency keys at ledger scale',
     rank: 1,
     total: 480,
@@ -379,7 +379,7 @@ export const mockActivity: ActivityItem[] = [
 
 export const mockSolutionViewer = {
   id: 's-view-1',
-  challengeSlug: 'stripe-idempotency-ledger',
+  challengeSlug: 'idempotency-keys-ledger-scale',
   challengeTitle: 'Idempotency keys at ledger scale',
   solver: {
     username: 'mira',

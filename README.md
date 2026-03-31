@@ -56,6 +56,16 @@ make db:up
 
 Defaults match `.env.example` (`DATABASE_URL`). The API does not connect to Postgres until you add a client.
 
+## Running Judge0 locally
+
+```bash
+docker compose -f docker-compose.judge0.yml up -d
+```
+
+Wait about 30 seconds for Judge0 to initialise, then set `JUDGE0_API_URL=http://localhost:2358` in `.env`.
+
+Test: `curl http://localhost:2358/system_info`
+
 ## Quality checks
 
 ```bash
@@ -78,8 +88,8 @@ E2E uses `scripts/playwright-serve.mjs`: API on port **4010** (`FRONTEND_URL=htt
 
 ## Workspace layout
 
-| Path              | Package                                        |
-| ----------------- | ---------------------------------------------- |
+| Path              | Package                                    |
+| ----------------- | ------------------------------------------ |
 | `apps/server`     | `@hackadevs/server`                        |
 | `apps/web`        | `@hackadevs/web`                           |
 | `packages/config` | `@hackadevs/config` (Zod env)              |

@@ -29,6 +29,14 @@ enum UserRole {
   ADMIN
 }
 
+enum AvailabilityStatus {
+  UNSPECIFIED
+  OPEN_TO_WORK
+  EMPLOYED
+  NOT_LOOKING
+  FREELANCE_OPEN
+}
+
 enum Categories {
   BACKEND
   FRONTEND
@@ -101,6 +109,7 @@ enum NotificationType {
   BADGE_EARNED
   SOLUTION_FEATURED
   COMPANY_BOOKMARKED
+  STREAK
 }
 
 enum BadgeType {
@@ -139,9 +148,10 @@ model User {
   id                    String            @id @default(cuid())
   username              String            @unique
   email                 String            @unique
-  passwordHash          String
+  passwordHash          String?
   displayName           String
-  tagline               String?
+  tagline               String?           @db.VarChar(120)
+  githubId              String?           @unique
   avatarUrl             String?
   githubUrl             String?
   linkedinUrl           String?
@@ -156,11 +166,12 @@ model User {
   lastSubmissionDate    DateTime?
   streakGracesRemaining Int               @default(1)
   tier                  UserTier          @default(NOVICE)
-  selfDeclaredLevel     SelfDeclaredLevel @default(MID)
+  selfDeclaredLevel     SelfDeclaredLevel @default(JUNIOR)
   isVerified            Boolean           @default(false)
   isBanned              Boolean           @default(false)
   banReason             String?
   role                  UserRole          @default(USER)
+  availabilityStatus    AvailabilityStatus @default(UNSPECIFIED)
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
   deletedAt             DateTime?
@@ -208,7 +219,8 @@ model Challenge {
   id                        String              @id @default(cuid())
   slug                      String              @unique
   title                     String
-  problemStatement          String
+  problemStatement          String              @db.Text
+  votingSettled             Boolean             @default(false)
   constraints               String[]
   bonusObjective            String?
   exampleInput              String?
@@ -242,7 +254,7 @@ model Submission {
   user                 User               @relation(fields: [userId], references: [id])
   challengeId          String
   challenge            Challenge          @relation(fields: [challengeId], references: [id])
-  code                 String
+  code                 String             @db.Text
   language             SubmissionLanguage
   rationaleApproach    String
   rationaleTradeoffs   String
@@ -383,7 +395,8 @@ model CompanyPortal {
   id           String              @id @default(cuid())
   companyName  String
   domainEmail  String              @unique
-  linkedinUrl  String
+  portalSecret String              @unique
+  linkedinUrl  String?
   isVerified   Boolean             @default(false)
   verifiedAt   DateTime?
   contactName  String

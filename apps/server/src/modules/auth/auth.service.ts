@@ -1,10 +1,68 @@
+import { createHash, randomBytes } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import type { PrismaClient } from '@prisma/client'
+import type { PrismaClient, UserRole } from '@prisma/client'
 import { createUser, findUserByEmail } from './auth.model.js'
 import type { LoginBody, RegisterBody } from './auth.schema.js'
+import { toUserPublic, type UserPublicShape } from './user-public.js'
 
 const SALT_ROUNDS = 12
+const REFRESH_TTL_MS = 30 * 86400000
+
+function hashRefreshToken(raw: string): string {
+  return createHash('sha256').update(raw, 'utf8').digest('hex')
+}
+
+export async function issueRefreshTokenPair(prisma: PrismaClient, userId: string) {
+  const raw = randomBytes(32).toString('base64url')
+  const tokenHash = hashRefreshToken(raw)
+  const expiresAt = new Date(Date.now() + REFRESH_TTL_MS)
+  await prisma.refreshToken.create({
+    data: { userId, tokenHash, expiresAt },
+  })
+  return { refreshToken: raw }
+}
+
+export async function rotateRefreshToken(
+  prisma: PrismaClient,
+  raw: string,
+): Promise<{ userId: string; refreshToken: string } | null> {
+  const tokenHash = hashRefreshToken(raw)
+  const row = await prisma.refreshToken.findFirst({
+    where: {
+      tokenHash,
+      revokedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+  })
+  if (!row) return null
+  await prisma.refreshToken.update({
+    where: { id: row.id },
+    data: { revokedAt: new Date() },
+  })
+  const next = await issueRefreshTokenPair(prisma, row.userId)
+  return { userId: row.userId, refreshToken: next.refreshToken }
+}
+
+export async function revokeRefreshTokenByRaw(prisma: PrismaClient, raw: string | undefined) {
+  if (!raw?.trim()) return
+  const tokenHash = hashRefreshToken(raw)
+  await prisma.refreshToken.updateMany({
+    where: { tokenHash, revokedAt: null },
+    data: { revokedAt: new Date() },
+  })
+}
+
+async function loadUserPublic(
+  prisma: PrismaClient,
+  userId: string,
+): Promise<UserPublicShape | null> {
+  const u = await prisma.user.findFirst({
+    where: { id: userId, deletedAt: null },
+    include: { categoryReps: { where: { deletedAt: null } } },
+  })
+  return u ? toUserPublic(u) : null
+}
 
 export async function registerUser(prisma: PrismaClient, body: RegisterBody) {
   const existing = await findUserByEmail(prisma, body.email)
@@ -18,13 +76,17 @@ export async function registerUser(prisma: PrismaClient, body: RegisterBody) {
     return { ok: false as const, error: 'username_taken' }
   }
   const passwordHash = await bcrypt.hash(body.password, SALT_ROUNDS)
-  const user = await createUser(prisma, {
+  const created = await createUser(prisma, {
     email: body.email,
     username: body.username,
     passwordHash,
     displayName: body.displayName,
   })
-  return { ok: true as const, user }
+  const publicUser = await loadUserPublic(prisma, created.id)
+  if (!publicUser) {
+    return { ok: false as const, error: 'invalid_credentials' }
+  }
+  return { ok: true as const, user: publicUser }
 }
 
 export async function loginUser(prisma: PrismaClient, body: LoginBody) {
@@ -32,21 +94,20 @@ export async function loginUser(prisma: PrismaClient, body: LoginBody) {
   if (!user || user.deletedAt || user.isBanned) {
     return { ok: false as const, error: 'invalid_credentials' }
   }
-  const match = await bcrypt.compare(body.password, user.passwordHash)
-  if (!match) {
+  if (!user.passwordHash) {
     return { ok: false as const, error: 'invalid_credentials' }
   }
-  return {
-    ok: true as const,
-    user: {
-      id: user.id,
-      username: user.username,
-      displayName: user.displayName,
-      email: user.email,
-    },
+  const valid = await bcrypt.compare(body.password, user.passwordHash)
+  if (!valid) {
+    return { ok: false as const, error: 'invalid_credentials' }
   }
+  const publicUser = await loadUserPublic(prisma, user.id)
+  if (!publicUser) {
+    return { ok: false as const, error: 'invalid_credentials' }
+  }
+  return { ok: true as const, user: publicUser }
 }
 
-export function signAccessToken(secret: string, userId: string, username: string) {
-  return jwt.sign({ sub: userId, username }, secret, { expiresIn: '7d' })
+export function signAccessToken(secret: string, userId: string, username: string, role: UserRole) {
+  return jwt.sign({ sub: userId, username, role }, secret, { expiresIn: '7d' })
 }

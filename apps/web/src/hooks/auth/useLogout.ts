@@ -5,7 +5,7 @@ import { AUTH } from '@/utils/api.routes'
 import { parseAxiosError } from '@/utils/axios-message'
 
 export function useLogout() {
-  const { clearSession } = useAuth()
+  const { clearSession, refreshToken } = useAuth()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -13,7 +13,7 @@ export function useLogout() {
     setLoading(true)
     setError(null)
     try {
-      await axiosInstance.post(AUTH.LOGOUT())
+      await axiosInstance.post(AUTH.LOGOUT(), refreshToken ? { refreshToken } : {})
     } catch (e) {
       const { message } = parseAxiosError(e)
       setError(message)

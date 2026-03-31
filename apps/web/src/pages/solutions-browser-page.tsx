@@ -29,7 +29,7 @@ export default function SolutionsBrowserPage() {
       <div className="mx-auto max-w-lg text-sm text-hd-secondary">
         Challenge not found.{' '}
         <Link to="/feed" className="text-hd-indigo-tint hover:text-hd-indigo-hover">
-          Feed
+          Home
         </Link>
       </div>
     )
@@ -39,7 +39,7 @@ export default function SolutionsBrowserPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <nav className="font-mono text-[12px] text-[rgba(255,255,255,0.6)]">
         <Link to="/feed" className="hover:text-hd-text">
-          Feed
+          Home
         </Link>
         <span className="mx-2 text-[rgba(255,255,255,0.35)]">/</span>
         <Link to={`/challenge/${slug}`} className="hover:text-hd-text">

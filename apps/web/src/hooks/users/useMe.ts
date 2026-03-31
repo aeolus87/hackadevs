@@ -4,6 +4,7 @@ import { axiosInstance } from '@/utils/axios.instance'
 import { USERS } from '@/utils/api.routes'
 import { parseAxiosError } from '@/utils/axios-message'
 import type { DevUser } from '@/types/hackadevs-api.types'
+import { unwrapSuccessData } from '@/lib/api-unwrap'
 
 export function useMe() {
   const { token, setUser } = useAuth()
@@ -21,9 +22,10 @@ export function useMe() {
     setLoading(true)
     setError(null)
     try {
-      const res = await axiosInstance.get<DevUser>(USERS.ME())
-      setData(res.data)
-      setUser(res.data)
+      const res = await axiosInstance.get<unknown>(USERS.ME())
+      const user = unwrapSuccessData<DevUser>(res.data)
+      setData(user)
+      setUser(user)
     } catch (e) {
       setError(parseAxiosError(e).message)
     } finally {

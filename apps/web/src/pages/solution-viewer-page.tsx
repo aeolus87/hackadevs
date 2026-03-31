@@ -1,26 +1,30 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { SolutionVoteBar } from '@/components/solution-vote-bar'
+import { useAuthUser } from '@/contexts/auth-context'
 import { useChallenge } from '@/hooks/challenges/useChallenge'
 import { useCastVote } from '@/hooks/votes/useCastVote'
 import { useRetractVote } from '@/hooks/votes/useRetractVote'
 import { useVoteCounts } from '@/hooks/votes/useVoteCounts'
 import { useSubmission } from '@/hooks/submissions/useSubmission'
-import { mockComments, mockSolutionViewer } from '@/data/mock'
-
-function votingPollOpen(closesAt?: string): boolean {
-  if (!closesAt) return false
-  return Date.now() < new Date(closesAt).getTime() + 48 * 3600000
-}
+import { getVotingState } from '@/utils/voting-ui'
 
 export default function SolutionViewerPage() {
+  const { isAuthenticated } = useAuthUser()
   const { slug = '', id = '' } = useParams()
   const { data: chApi } = useChallenge(slug)
   const { data: sub, loading } = useSubmission(id)
   const [voteCastAt, setVoteCastAt] = useState<number | null>(null)
+  const [nowTick, setNowTick] = useState(() => Date.now())
+
+  const votingState =
+    chApi?.closesAt != null
+      ? getVotingState(chApi.closesAt, chApi.votingSettled)
+      : ('active' as const)
+  const votingOpen = votingState === 'voting_open'
 
   const { data: counts, refetch: refetchCounts } = useVoteCounts(id, {
-    pollEnabled: votingPollOpen(chApi?.closesAt),
+    pollEnabled: votingOpen,
   })
 
   const { mutate: castVote, loading: castBusy } = useCastVote(() => {
@@ -36,25 +40,32 @@ export default function SolutionViewerPage() {
     return Date.now() - voteCastAt < 5 * 60 * 1000
   }, [counts?.userVote, voteCastAt])
 
-  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!canRetract || voteCastAt == null) return
+    const t = window.setInterval(() => setNowTick(Date.now()), 1000)
+    return () => window.clearInterval(t)
+  }, [canRetract, voteCastAt])
 
-  const fallback =
-    mockSolutionViewer.challengeSlug === slug && mockSolutionViewer.id === id
-      ? mockSolutionViewer
-      : null
+  const retractSecondsRemaining = useMemo(() => {
+    if (voteCastAt == null || !canRetract) return null
+    const msLeft = 5 * 60 * 1000 - (nowTick - voteCastAt)
+    return Math.max(0, Math.ceil(msLeft / 1000))
+  }, [voteCastAt, canRetract, nowTick])
+
+  const [copied, setCopied] = useState(false)
 
   if (!id) {
     return (
       <div className="mx-auto max-w-lg text-sm text-hd-secondary">
         Invalid solution.{' '}
         <Link to="/feed" className="text-hd-indigo-tint">
-          Feed
+          Home
         </Link>
       </div>
     )
   }
 
-  if (loading && !sub && !fallback) {
+  if (loading && !sub) {
     return (
       <div className="mx-auto max-w-lg animate-pulse rounded-[12px] bg-[rgba(255,255,255,0.04)] p-8 text-sm text-hd-muted">
         Loading…
@@ -62,12 +73,12 @@ export default function SolutionViewerPage() {
     )
   }
 
-  if (!loading && !sub && !fallback) {
+  if (!loading && !sub) {
     return (
       <div className="mx-auto max-w-lg text-sm text-hd-secondary">
         Solution not found.{' '}
         <Link to="/feed" className="text-hd-indigo-tint">
-          Feed
+          Home
         </Link>
       </div>
     )
@@ -87,26 +98,14 @@ export default function SolutionViewerPage() {
         total: 0,
         submittedAt: sub.submittedAt ?? '',
         rationale: {
-          approach: sub.rationaleApproach,
-          tradeoffs: sub.rationaleTradeoffs,
-          scale: sub.rationaleScale,
+          approach: sub.rationaleApproach ?? '',
+          tradeoffs: sub.rationaleTradeoffs ?? '',
+          scale: sub.rationaleScale ?? '',
         },
         upvotes: sub.upvoteCount,
         downvotes: sub.downvoteCount,
       }
-    : fallback
-      ? {
-          code: fallback.code,
-          language: fallback.language,
-          solver: fallback.solver,
-          rank: fallback.rank,
-          total: fallback.total,
-          submittedAt: fallback.submittedAt,
-          rationale: fallback.rationale,
-          upvotes: fallback.upvotes,
-          downvotes: fallback.downvotes,
-        }
-      : null
+    : null
 
   if (!sol) {
     return null
@@ -172,12 +171,13 @@ export default function SolutionViewerPage() {
         ))}
       </div>
 
-      {sub && (
+      {sub && votingOpen && isAuthenticated && (
         <SolutionVoteBar
           upvoteCount={up}
           downvoteCount={down}
           userVote={userVote}
           canRetract={canRetract}
+          retractSecondsRemaining={retractSecondsRemaining}
           busy={castBusy || retractBusy}
           onUpvote={async () => {
             try {
@@ -198,63 +198,29 @@ export default function SolutionViewerPage() {
           onRetract={() => void retractVote(id)}
         />
       )}
-
-      {fallback && !sub && (
-        <SolutionVoteBar
-          upvoteCount={sol.upvotes}
-          downvoteCount={sol.downvotes}
-          userVote={null}
-          canRetract={false}
-          onUpvote={() => {}}
-          onDownvote={() => {}}
-          onRetract={() => {}}
-        />
+      {sub && votingOpen && !isAuthenticated && (
+        <div className="rounded-[12px] border border-hd-border bg-hd-card px-6 py-8 text-center">
+          <p className="mb-4 text-sm font-medium text-hd-text">Sign in to vote on solutions</p>
+          <Link
+            to="/login"
+            state={{ returnTo: `/challenge/${slug}/solutions/${id}` }}
+            className="inline-flex rounded-full bg-hd-indigo px-6 py-2.5 text-sm font-medium text-white transition-colors duration-150 hover:bg-hd-indigo-hover"
+          >
+            Sign in
+          </Link>
+        </div>
+      )}
+      {sub && !votingOpen && chApi?.closesAt && (
+        <div className="rounded-[12px] border border-hd-border bg-hd-card px-6 py-8 text-center text-sm text-hd-muted">
+          {votingState === 'active' && 'Voting opens after the challenge closes.'}
+          {votingState === 'voting_closed' && 'Finalising results — voting has closed.'}
+          {votingState === 'results_final' && 'Results are final.'}
+        </div>
       )}
 
       <div className="space-y-6">
         <h2 className="text-sm font-medium text-hd-text">Comments</h2>
-        {mockComments.map((c) => (
-          <div key={c.id} className="rounded-[12px] border border-hd-border bg-hd-card p-4">
-            <div className="flex items-center gap-2">
-              <img
-                src={c.author.avatar}
-                alt=""
-                className="h-8 w-8 rounded-full"
-                width={32}
-                height={32}
-              />
-              <div>
-                <span className="text-sm font-medium text-hd-text">{c.author.name}</span>
-                <span className="ml-2 font-mono text-[10px] text-hd-muted">
-                  rank #{c.author.rank}
-                </span>
-              </div>
-              <span className="ml-auto font-mono text-[11px] text-hd-muted">{c.time}</span>
-            </div>
-            <p className="mt-2 text-sm text-hd-secondary">{c.body}</p>
-            <div className="mt-3 rounded-lg border border-hd-border bg-hd-surface p-2 font-mono text-[12px]">
-              <div className="text-hd-emerald">+ await outbox.enqueue(event)</div>
-              <div className="text-hd-rose">- await bus.publish(event)</div>
-            </div>
-            {c.replies?.map((r) => (
-              <div key={r.id} className="ml-6 mt-4 border-l border-hd-border pl-4">
-                <div className="flex items-center gap-2">
-                  <img
-                    src={r.author.avatar}
-                    alt=""
-                    className="h-7 w-7 rounded-full"
-                    width={28}
-                    height={28}
-                  />
-                  <span className="text-sm font-medium text-hd-text">{r.author.name}</span>
-                  <span className="font-mono text-[10px] text-hd-muted">rank #{r.author.rank}</span>
-                  <span className="ml-auto font-mono text-[11px] text-hd-muted">{r.time}</span>
-                </div>
-                <p className="mt-2 text-sm text-hd-secondary">{r.body}</p>
-              </div>
-            ))}
-          </div>
-        ))}
+        <p className="text-sm text-hd-muted">Comments are not available yet.</p>
       </div>
 
       <div className="flex flex-wrap justify-between gap-4 border-t border-hd-border pt-8">

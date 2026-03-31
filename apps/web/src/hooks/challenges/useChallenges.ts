@@ -11,8 +11,10 @@ export function useChallenges(params?: {
   difficulty?: Difficulty
   tag?: string
   page?: number
+  limit?: number
 }) {
   const page = params?.page ?? 1
+  const limit = params?.limit
   const [data, setData] = useState<Paginated<Challenge> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -24,6 +26,7 @@ export function useChallenges(params?: {
       const res = await axiosInstance.get(CHALLENGES.LIST(), {
         params: {
           page,
+          limit,
           status: params?.status,
           category: params?.category,
           difficulty: params?.difficulty,
@@ -37,7 +40,7 @@ export function useChallenges(params?: {
     } finally {
       setLoading(false)
     }
-  }, [page, params?.status, params?.category, params?.difficulty, params?.tag])
+  }, [page, limit, params?.status, params?.category, params?.difficulty, params?.tag])
 
   useEffect(() => {
     void refetch()

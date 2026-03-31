@@ -1,10 +1,26 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import {
+  AuthDivider,
+  AuthGitHubButton,
+  AuthLabel,
+  AuthPageShell,
+  authInputClassName,
+  authPrimaryButtonClassName,
+} from '@/components/auth-page-shell'
 import { useLogin } from '@/hooks/auth/useLogin'
 import { InlineError } from '@/components/inline-error'
+import { AUTH, BASE_URL } from '@/utils/api.routes'
+import { safeReturnTo, type AuthReturnState } from '@/utils/login-path'
+
+const githubOAuthUrl = `${BASE_URL}${AUTH.GITHUB()}`
 
 export default function LoginPage() {
-  const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const stateReturn = safeReturnTo((location.state as AuthReturnState | null)?.returnTo)
+  const queryReturn = safeReturnTo(searchParams.get('returnTo'))
+  const returnTo = queryReturn ?? stateReturn
   const { mutate, loading, error } = useLogin()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -12,51 +28,66 @@ export default function LoginPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await mutate({ email, password })
-      navigate('/feed', { replace: true })
+      await mutate({ email, password, returnTo })
     } catch {
-      /* surfaced via error state */
+      return
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-hd-page px-4">
-      <div className="w-full max-w-sm rounded-[16px] border border-hd-border bg-hd-card p-6">
-        <h1 className="text-lg font-medium text-hd-text">Sign in to HackaDevs</h1>
-        <form onSubmit={submit} className="mt-6 space-y-3">
+    <AuthPageShell
+      title="Sign in"
+      footer={
+        <>
+          New here?{' '}
+          <Link
+            to="/register"
+            state={returnTo ? { returnTo } : undefined}
+            className="font-medium text-hd-indigo-tint transition-colors hover:text-hd-indigo-hover"
+          >
+            Create an account
+          </Link>
+        </>
+      }
+    >
+      <AuthGitHubButton href={githubOAuthUrl} />
+      <AuthDivider label="or email" />
+      <form onSubmit={submit} className="space-y-3">
+        <div>
+          <AuthLabel htmlFor="login-email">Email</AuthLabel>
           <input
+            id="login-email"
             type="email"
             required
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
-            className="w-full rounded-lg border border-hd-border bg-hd-surface px-3 py-2 text-sm text-hd-text placeholder:text-hd-muted focus:border-hd-border-hover focus:outline-none"
+            placeholder="you@example.com"
+            className={`mt-1 ${authInputClassName}`}
           />
+        </div>
+        <div>
+          <AuthLabel htmlFor="login-password">Password</AuthLabel>
           <input
+            id="login-password"
             type="password"
             required
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
-            className="w-full rounded-lg border border-hd-border bg-hd-surface px-3 py-2 text-sm text-hd-text placeholder:text-hd-muted focus:border-hd-border-hover focus:outline-none"
+            placeholder="••••••••"
+            className={`mt-1 ${authInputClassName}`}
           />
-          {error && <InlineError message={error} />}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-full bg-hd-indigo py-2.5 text-sm font-medium text-white transition-colors duration-150 hover:bg-hd-indigo-hover disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {loading ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
-        <p className="mt-4 text-center text-sm text-hd-muted">
-          <Link to="/register" className="text-hd-indigo-tint hover:text-hd-indigo-hover">
-            Create an account
-          </Link>
-        </p>
-      </div>
-    </div>
+        </div>
+        {error ? <InlineError message={error} /> : null}
+        <button
+          type="submit"
+          disabled={loading}
+          className={authPrimaryButtonClassName}
+        >
+          {loading ? 'Signing in…' : 'Sign in'}
+        </button>
+      </form>
+    </AuthPageShell>
   )
 }

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { HdSelect } from '@/components/ui/hd-select'
 import CodeMirror from '@uiw/react-codemirror'
 import { javascript } from '@codemirror/lang-javascript'
 import { python } from '@codemirror/lang-python'
@@ -14,6 +15,8 @@ const languages = [
   { id: 'rs', label: 'Rust', ext: rust() },
   { id: 'json', label: 'JSON', ext: json() },
 ] as const
+
+const LANGUAGE_OPTIONS = languages.map((l) => ({ value: l.id, label: l.label }))
 
 export type TestCaseResult = {
   id: string
@@ -65,17 +68,16 @@ export function SolutionEditor({
   return (
     <div className="flex h-full min-h-[320px] flex-col rounded-[12px] border border-hd-border bg-hd-card">
       <div className="flex items-center justify-end border-b border-hd-border px-2 py-2">
-        <select
-          value={lang}
-          onChange={(e) => setLang(e.target.value as (typeof languages)[number]['id'])}
-          className="rounded-lg border border-hd-border bg-hd-surface px-2 py-1.5 font-mono text-xs text-hd-text"
-        >
-          {languages.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.label}
-            </option>
-          ))}
-        </select>
+        <div className="ml-auto w-full max-w-[13rem]">
+          <HdSelect
+            aria-label="Language"
+            size="sm"
+            value={lang}
+            onChange={(v) => setLang(v as (typeof languages)[number]['id'])}
+            options={LANGUAGE_OPTIONS}
+            buttonClassName="bg-hd-card"
+          />
+        </div>
       </div>
       <div className="min-h-0 flex-1 overflow-hidden">
         <CodeMirror

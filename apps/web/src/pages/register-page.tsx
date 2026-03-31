@@ -1,10 +1,21 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import {
+  AuthLabel,
+  AuthPageShell,
+  authInputClassName,
+  authPrimaryButtonClassName,
+} from '@/components/auth-page-shell'
 import { useRegister } from '@/hooks/auth/useRegister'
 import { InlineError } from '@/components/inline-error'
+import { safeReturnTo, type AuthReturnState } from '@/utils/login-path'
 
 export default function RegisterPage() {
-  const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const returnTo =
+    safeReturnTo(searchParams.get('returnTo')) ??
+    safeReturnTo((location.state as AuthReturnState | null)?.returnTo)
   const { mutate, loading, error } = useRegister()
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
@@ -14,65 +25,91 @@ export default function RegisterPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await mutate({ username, email, password, displayName })
-      navigate('/feed', { replace: true })
+      await mutate({ username, email, password, displayName, returnTo })
     } catch {
-      /* surfaced via error state */
+      return
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-hd-page px-4">
-      <div className="w-full max-w-sm rounded-[16px] border border-hd-border bg-hd-card p-6">
-        <h1 className="text-lg font-medium text-hd-text">Join HackaDevs</h1>
-        <form onSubmit={submit} className="mt-6 space-y-3">
+    <AuthPageShell
+      title="Create account"
+      footer={
+        <>
+          Already have an account?{' '}
+          <Link
+            to="/login"
+            state={returnTo ? { returnTo } : undefined}
+            className="font-medium text-hd-indigo-tint transition-colors hover:text-hd-indigo-hover"
+          >
+            Sign in
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={submit} className="space-y-3">
+        <div>
+          <AuthLabel htmlFor="register-display">Display name</AuthLabel>
           <input
+            id="register-display"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="Display name"
+            placeholder="Ada Lovelace"
             required
-            className="w-full rounded-lg border border-hd-border bg-hd-surface px-3 py-2 text-sm text-hd-text placeholder:text-hd-muted focus:border-hd-border-hover focus:outline-none"
+            autoComplete="name"
+            className={`mt-1 ${authInputClassName}`}
           />
+        </div>
+        <div>
+          <AuthLabel htmlFor="register-username">Username</AuthLabel>
           <input
+            id="register-username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            placeholder="Username"
+            placeholder="ada_dev"
             required
             minLength={2}
-            className="w-full rounded-lg border border-hd-border bg-hd-surface px-3 py-2 font-mono text-sm text-hd-text placeholder:text-hd-muted focus:border-hd-border-hover focus:outline-none"
+            autoComplete="username"
+            className={`mt-1 font-mono ${authInputClassName}`}
           />
+        </div>
+        <div>
+          <AuthLabel htmlFor="register-email">Email</AuthLabel>
           <input
+            id="register-email"
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
-            className="w-full rounded-lg border border-hd-border bg-hd-surface px-3 py-2 text-sm text-hd-text placeholder:text-hd-muted focus:border-hd-border-hover focus:outline-none"
+            placeholder="you@example.com"
+            autoComplete="email"
+            className={`mt-1 ${authInputClassName}`}
           />
+        </div>
+        <div>
+          <AuthLabel htmlFor="register-password">Password</AuthLabel>
           <input
+            id="register-password"
             type="password"
             required
             minLength={10}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password (min 10 characters)"
-            className="w-full rounded-lg border border-hd-border bg-hd-surface px-3 py-2 text-sm text-hd-text placeholder:text-hd-muted focus:border-hd-border-hover focus:outline-none"
+            placeholder="At least 10 characters"
+            autoComplete="new-password"
+            className={`mt-1 ${authInputClassName}`}
           />
-          {error && <InlineError message={error} />}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-full bg-hd-indigo py-2.5 text-sm font-medium text-white transition-colors duration-150 hover:bg-hd-indigo-hover disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {loading ? 'Creating account…' : 'Register'}
-          </button>
-        </form>
-        <p className="mt-4 text-center text-sm text-hd-muted">
-          <Link to="/login" className="text-hd-indigo-tint hover:text-hd-indigo-hover">
-            Already have an account?
-          </Link>
-        </p>
-      </div>
-    </div>
+          <p className="mt-1 font-mono text-[10px] text-hd-muted">Minimum 10 characters</p>
+        </div>
+        {error ? <InlineError message={error} /> : null}
+        <button
+          type="submit"
+          disabled={loading}
+          className={authPrimaryButtonClassName}
+        >
+          {loading ? 'Creating account…' : 'Create account'}
+        </button>
+      </form>
+    </AuthPageShell>
   )
 }

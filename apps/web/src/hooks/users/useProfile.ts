@@ -3,6 +3,7 @@ import { axiosInstance } from '@/utils/axios.instance'
 import { USERS } from '@/utils/api.routes'
 import { parseAxiosError } from '@/utils/axios-message'
 import type { DevUser } from '@/types/hackadevs-api.types'
+import { unwrapSuccessData } from '@/lib/api-unwrap'
 
 export function useProfile(username: string) {
   const [data, setData] = useState<DevUser | null>(null)
@@ -19,8 +20,8 @@ export function useProfile(username: string) {
     setLoading(true)
     setError(null)
     try {
-      const res = await axiosInstance.get<DevUser>(USERS.PROFILE(username))
-      setData(res.data)
+      const res = await axiosInstance.get<unknown>(USERS.PROFILE(username))
+      setData(unwrapSuccessData<DevUser>(res.data))
     } catch (e) {
       const { message, status } = parseAxiosError(e)
       setError(message)

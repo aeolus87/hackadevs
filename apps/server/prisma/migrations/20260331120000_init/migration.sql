@@ -50,7 +50,7 @@ CREATE TABLE "User" (
     "email" TEXT NOT NULL,
     "passwordHash" TEXT NOT NULL,
     "displayName" TEXT NOT NULL,
-    "tagline" TEXT,
+    "tagline" VARCHAR(120),
     "avatarUrl" TEXT,
     "githubUrl" TEXT,
     "linkedinUrl" TEXT,

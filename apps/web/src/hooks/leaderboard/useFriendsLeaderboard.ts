@@ -4,6 +4,7 @@ import { axiosInstance } from '@/utils/axios.instance'
 import { LEADERBOARD } from '@/utils/api.routes'
 import { parseAxiosError } from '@/utils/axios-message'
 import type { LeaderboardEntry } from '@/types/hackadevs-api.types'
+import { unwrapSuccessData } from '@/lib/api-unwrap'
 
 function extractEntries(raw: unknown): LeaderboardEntry[] {
   if (Array.isArray(raw)) return raw as LeaderboardEntry[]
@@ -32,8 +33,8 @@ export function useFriendsLeaderboard(opts?: { enabled?: boolean }) {
     setLoading(true)
     setError(null)
     try {
-      const res = await axiosInstance.get(LEADERBOARD.FRIENDS())
-      setData(extractEntries(res.data))
+      const res = await axiosInstance.get<unknown>(LEADERBOARD.FRIENDS())
+      setData(extractEntries(unwrapSuccessData(res.data)))
     } catch (e) {
       setError(parseAxiosError(e).message)
       setData(null)

@@ -31,12 +31,34 @@ export type Tier =
 
 export type SelfLevel = 'JUNIOR' | 'MID' | 'SENIOR'
 
+export type AvailabilityStatus =
+  | 'UNSPECIFIED'
+  | 'OPEN_TO_WORK'
+  | 'EMPLOYED'
+  | 'NOT_LOOKING'
+  | 'FREELANCE_OPEN'
+
+export type UserRole = 'USER' | 'ADMIN' | 'MODERATOR'
+
 export type VoteValue = 'UP' | 'DOWN'
+
+export interface ProfilePinnedSubmission {
+  id: string
+  challengeSlug: string
+  challengeTitle: string
+  finalRank: number | null
+  preliminaryRank: number | null
+  upvoteCount: number
+  downvoteCount: number
+  rationaleExcerpt: string
+  submittedAt: string | null
+}
 
 export interface DevUser {
   id: string
   username: string
   displayName: string
+  role?: UserRole
   tagline?: string
   avatarUrl?: string
   githubUrl?: string
@@ -51,9 +73,31 @@ export interface DevUser {
   weeklyRepDelta: number
   categoryReps: { category: Category; rep: number; rank?: number }[]
   badges: { type: string; awardedAt: string }[]
+  availabilityStatus?: AvailabilityStatus
+  pinnedSubmissions?: ProfilePinnedSubmission[]
+  viewerFollows?: boolean
 }
 
 export type SubmissionAuthor = Pick<DevUser, 'id' | 'username' | 'displayName' | 'avatarUrl'>
+
+export type ChallengeStatus = 'DRAFT' | 'SCHEDULED' | 'ACTIVE' | 'CLOSED' | 'ARCHIVED'
+
+export interface GlobalSearchChallengeHit {
+  slug: string
+  title: string
+  category: Category
+}
+
+export interface GlobalSearchUserHit {
+  username: string
+  displayName: string
+  avatarUrl: string | null
+}
+
+export interface GlobalSearchResponse {
+  challenges: GlobalSearchChallengeHit[]
+  users: GlobalSearchUserHit[]
+}
 
 export interface Challenge {
   id: string
@@ -68,11 +112,13 @@ export interface Challenge {
   category: Category
   difficulty: Difficulty
   weekTheme: string
-  status: 'ACTIVE' | 'CLOSED' | 'ARCHIVED'
+  status: ChallengeStatus
   opensAt: string
   closesAt: string
   companySource?: string
   submissionCount: number
+  votingSettled?: boolean
+  companyAttributionOptIn?: boolean
   visibleTestCases: { input: string; expectedOutput: string }[]
 }
 
@@ -80,6 +126,7 @@ export interface Submission {
   id: string
   userId: string
   challengeId: string
+  challenge?: { slug: string; title: string; category: Category }
   code: string
   language: Language
   rationaleApproach: string
@@ -107,17 +154,18 @@ export interface TestRunResult {
   executionTimeMs: number
 }
 
-export type LeaderboardUser = Pick<
-  DevUser,
-  'id' | 'username' | 'displayName' | 'avatarUrl' | 'totalRep'
->
-
 export interface LeaderboardEntry {
-  rank: number
-  weeklyRankDelta: number
-  user: LeaderboardUser
-  challengesSolved: number
-  bestCategory: Category
+  userId: string
+  username: string
+  displayName: string
+  avatarUrl: string | null
+  totalRep: number
+  globalRank: number | null
+  tier: Tier
+  weeklyRepDelta: number
+  currentStreakDays: number
+  bestCategory: Category | null
+  categoryRank: number | null
 }
 
 export interface Notification {
@@ -148,5 +196,6 @@ export interface ActivityEvent {
 export type AuthTokenResponse = {
   accessToken?: string
   token?: string
+  refreshToken?: string
   user: Partial<DevUser> & { id: string; username: string; displayName: string }
 }

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ActivityFeed } from '@/components/activity-feed'
 import { DevProfileHeader } from '@/components/dev-profile-header'
@@ -12,25 +12,44 @@ import { useUnfollow } from '@/hooks/follows/useUnfollow'
 import { useFollowers } from '@/hooks/users/useFollowers'
 import { useFollowing } from '@/hooks/users/useFollowing'
 import { useProfile } from '@/hooks/users/useProfile'
+import { useUserActivity } from '@/hooks/users/useUserActivity'
 import { useUnreadCount } from '@/hooks/notifications/useUnreadCount'
-import { mockActivity, mockPinned } from '@/data/mock'
+import { activityEventToUiItem } from '@/utils/map-activity-event'
 import { apiDevUserToUi } from '@/utils/map-api-user'
 
 export default function ProfilePage() {
   const { username = '' } = useParams()
-  const { user: viewer } = useAuthUser()
+  const { user: viewer, isAuthenticated } = useAuthUser()
   useUnreadCount()
   const { data, loading, error, refetch } = useProfile(username)
+  const {
+    data: actData,
+    loading: actLoading,
+    error: actError,
+    refetch: refetchAct,
+  } = useUserActivity(username)
   const { data: fol } = useFollowers(username)
   const { data: fing } = useFollowing(username)
   const toast = useToast()
   const [following, setFollowing] = useState(false)
+
+  useEffect(() => {
+    if (data?.viewerFollows !== undefined) setFollowing(data.viewerFollows)
+  }, [data?.viewerFollows])
+
+  const activityItems = useMemo(
+    () => (actData?.data ?? []).map((ev, i) => activityEventToUiItem(ev, i)),
+    [actData],
+  )
+
+  const pinned = data?.pinnedSubmissions ?? []
 
   const refetchProfile = useCallback(() => void refetch(), [refetch])
   const { mutate: followMut } = useFollow(refetchProfile)
   const { mutate: unfollowMut } = useUnfollow(refetchProfile)
 
   const toggleFollow = async () => {
+    if (!isAuthenticated) return
     try {
       if (following) {
         setFollowing(false)
@@ -59,7 +78,7 @@ export default function ProfilePage() {
       <div className="mx-auto max-w-lg space-y-4">
         <InlineError message={`Could not load profile. ${error}`} onRetry={() => void refetch()} />
         <Link to="/feed" className="text-sm text-hd-indigo-tint">
-          Back to feed
+          Back to home
         </Link>
       </div>
     )
@@ -70,7 +89,7 @@ export default function ProfilePage() {
       <div className="mx-auto max-w-lg rounded-[12px] border border-hd-border border-l-4 border-l-hd-rose bg-hd-card p-6">
         <p className="text-sm text-hd-secondary">Profile not found.</p>
         <Link to="/feed" className="mt-3 inline-block text-sm font-medium text-hd-indigo-tint">
-          Back to feed
+          Back to home
         </Link>
       </div>
     )
@@ -86,7 +105,8 @@ export default function ProfilePage() {
         viewerUsername={viewer?.username ?? null}
         following={following}
         followBusy={false}
-        onFollowToggle={isSelf ? undefined : toggleFollow}
+        signInToFollowReturn={!isSelf && !isAuthenticated ? `/u/${username}` : undefined}
+        onFollowToggle={isSelf || !isAuthenticated ? undefined : toggleFollow}
       />
       <div className="flex flex-wrap gap-4 text-sm text-hd-secondary">
         <span>
@@ -117,34 +137,49 @@ export default function ProfilePage() {
       </div>
       <section id="pinned">
         <h2 className="mb-4 text-sm font-medium text-hd-text">Pinned solutions</h2>
-        <div className="grid gap-4 md:grid-cols-3">
-          {mockPinned.map((p) => (
-            <div
-              key={p.challengeSlug}
-              className="flex flex-col rounded-[12px] border border-hd-border bg-hd-card p-4"
-            >
-              <Link
-                to={`/challenge/${p.challengeSlug}`}
-                className="text-sm font-medium leading-snug text-hd-text hover:text-hd-indigo-tint"
-              >
-                {p.challengeTitle}
-              </Link>
-              <span className="mt-2 inline-flex w-fit rounded-full border border-hd-border bg-hd-surface px-2 py-0.5 font-mono text-[11px] text-hd-secondary">
-                #{p.rank} / {p.total}
-              </span>
-              <p className="mt-2 line-clamp-2 text-[13px] text-hd-muted">{p.rationaleExcerpt}</p>
-              <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-3 text-[11px] text-hd-muted">
-                <span className="font-mono text-hd-secondary">{p.votes} votes</span>
-                <span className="font-mono">{p.date}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+        {pinned.length === 0 ? (
+          <p className="text-sm text-hd-muted">No pinned solutions yet.</p>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-3">
+            {pinned.map((p) => {
+              const rank = p.finalRank ?? p.preliminaryRank ?? null
+              const rankLabel = rank != null ? `#${rank}` : '—'
+              const when = p.submittedAt
+                ? new Date(p.submittedAt).toLocaleDateString(undefined, { dateStyle: 'medium' })
+                : '—'
+              return (
+                <div
+                  key={p.id}
+                  className="flex flex-col rounded-[12px] border border-hd-border bg-hd-card p-4"
+                >
+                  <Link
+                    to={`/challenge/${p.challengeSlug}/solutions/${p.id}`}
+                    className="text-sm font-medium leading-snug text-hd-text hover:text-hd-indigo-tint"
+                  >
+                    {p.challengeTitle}
+                  </Link>
+                  <span className="mt-2 inline-flex w-fit rounded-full border border-hd-border bg-hd-surface px-2 py-0.5 font-mono text-[11px] text-hd-secondary">
+                    Rank {rankLabel}
+                  </span>
+                  <p className="mt-2 line-clamp-2 text-[13px] text-hd-muted">
+                    {p.rationaleExcerpt}
+                  </p>
+                  <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-3 text-[11px] text-hd-muted">
+                    <span className="font-mono text-hd-secondary">↑ {p.upvoteCount} votes</span>
+                    <span className="font-mono">{when}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </section>
       <section>
         <h2 className="mb-4 text-sm font-medium text-hd-text">Recent activity</h2>
         <div className="rounded-[12px] border border-hd-border bg-hd-card p-4">
-          <ActivityFeed items={mockActivity} />
+          {actError && <InlineError message={actError} onRetry={() => void refetchAct()} />}
+          {actLoading && !actError && <p className="text-sm text-hd-muted">Loading activity…</p>}
+          {!actLoading && !actError && <ActivityFeed items={activityItems} />}
         </div>
       </section>
     </div>

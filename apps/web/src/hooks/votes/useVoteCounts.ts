@@ -3,6 +3,7 @@ import { axiosInstance } from '@/utils/axios.instance'
 import { VOTES } from '@/utils/api.routes'
 import { parseAxiosError } from '@/utils/axios-message'
 import type { VoteValue } from '@/types/hackadevs-api.types'
+import { unwrapSuccessData } from '@/lib/api-unwrap'
 
 export type VoteCounts = {
   upvoteCount: number
@@ -45,8 +46,8 @@ export function useVoteCounts(
     setLoading(true)
     setError(null)
     try {
-      const res = await axiosInstance.get(VOTES.COUNTS(submissionId))
-      setData(mapCounts(res.data))
+      const res = await axiosInstance.get<unknown>(VOTES.COUNTS(submissionId))
+      setData(mapCounts(unwrapSuccessData(res.data)))
     } catch (e) {
       setError(parseAxiosError(e).message)
       setData(null)

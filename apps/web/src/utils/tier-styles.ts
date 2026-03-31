@@ -1,4 +1,15 @@
-import type { PlatformTier } from '@/types/hackadevs'
+import type { PlatformTier, SelfDeclaredLevel } from '@/types/hackadevs'
+
+export function selfDeclaredLevelPillClass(level: SelfDeclaredLevel): string {
+  switch (level) {
+    case 'SENIOR':
+      return 'border-hd-indigo/40 bg-hd-indigo-surface text-hd-indigo-tint'
+    case 'MID':
+      return 'border-[rgba(96,165,250,0.4)] bg-[rgba(96,165,250,0.1)] text-[#BFDBFE]'
+    case 'JUNIOR':
+      return 'border-hd-border bg-hd-card text-hd-secondary'
+  }
+}
 
 export function platformTierPillClass(tier: PlatformTier): string {
   switch (tier) {

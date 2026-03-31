@@ -21,5 +21,6 @@ export function sessionUserFromAuthResponse(
     weeklyRepDelta: u.weeklyRepDelta ?? 0,
     categoryReps: u.categoryReps ?? [],
     badges: u.badges ?? [],
+    availabilityStatus: u.availabilityStatus ?? 'UNSPECIFIED',
   }
 }

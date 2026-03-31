@@ -15,8 +15,11 @@ import SolutionViewerPage from '@/pages/solution-viewer-page'
 import SettingsPage from '@/pages/settings-page'
 import LoginPage from '@/pages/login-page'
 import RegisterPage from '@/pages/register-page'
+import AuthCallbackPage from '@/pages/auth-callback-page'
 import NotificationsPage from '@/pages/notifications-page'
 import NotFoundPage from '@/pages/not-found-page'
+import AdminChallengesPage from '@/pages/admin/admin-challenges-page'
+import { StaffRoute } from '@/components/routes/staff-route'
 
 function Shell({ children }: { children: ReactNode }) {
   return (
@@ -36,6 +39,7 @@ export default function App() {
             <Route path="/" element={<Navigate to="/feed" replace />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route
               path="/feed"
               element={
@@ -113,6 +117,16 @@ export default function App() {
               element={
                 <Shell>
                   <NotificationsPage />
+                </Shell>
+              }
+            />
+            <Route
+              path="/admin/challenges"
+              element={
+                <Shell>
+                  <StaffRoute>
+                    <AdminChallengesPage />
+                  </StaffRoute>
                 </Shell>
               }
             />

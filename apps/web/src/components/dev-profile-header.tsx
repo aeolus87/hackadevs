@@ -3,7 +3,9 @@ import type { DevUser, SelfDeclaredLevel } from '@/types/hackadevs'
 import { RepScore } from '@/components/rep-score'
 import { SocialLinkRow } from '@/components/social-link-row'
 import { avatarRingClass } from '@/utils/category-styles'
-import { platformTierPillClass } from '@/utils/tier-styles'
+import { platformTierPillClass, selfDeclaredLevelPillClass } from '@/utils/tier-styles'
+import { safeReturnTo } from '@/utils/login-path'
+import { availabilityLabel } from '@/utils/availability-ui'
 
 type DevProfileHeaderProps = {
   user: DevUser
@@ -11,6 +13,7 @@ type DevProfileHeaderProps = {
   following?: boolean
   followBusy?: boolean
   onFollowToggle?: () => void
+  signInToFollowReturn?: string
 }
 
 function declaredLabel(level: SelfDeclaredLevel): string {
@@ -25,12 +28,16 @@ export function DevProfileHeader({
   following,
   followBusy,
   onFollowToggle,
+  signInToFollowReturn,
 }: DevProfileHeaderProps) {
   const isSelf = viewerUsername != null && user.username === viewerUsername
+  const signInFollowDest = safeReturnTo(signInToFollowReturn ?? null)
   const ring = avatarRingClass(user.topCategory)
-  const declared =
+  const declared: SelfDeclaredLevel =
     user.selfDeclaredLevel ??
     (user.tier === 'Senior' ? 'SENIOR' : user.tier === 'Mid' ? 'MID' : 'JUNIOR')
+  const rankLabel = user.rankPercentile.trim()
+  const workLabel = availabilityLabel(user.availabilityStatus)
 
   return (
     <div className="rounded-[16px] border border-hd-border bg-hd-elevated p-6 md:p-8">
@@ -52,18 +59,27 @@ export function DevProfileHeader({
               >
                 {user.platformTier}
               </span>
-              <span className="rounded-full border border-hd-border bg-hd-surface px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wide text-hd-muted">
+              <span
+                className={`rounded-full border px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wide ${selfDeclaredLevelPillClass(declared)}`}
+              >
                 {declaredLabel(declared)}
               </span>
+              {workLabel ? (
+                <span className="rounded-full border border-hd-emerald/35 bg-hd-emerald/10 px-2 py-0.5 font-mono text-[10px] font-medium text-hd-emerald">
+                  {workLabel}
+                </span>
+              ) : null}
             </div>
             {user.tagline && (
               <p className="mt-3 max-w-xl text-sm text-hd-secondary">{user.tagline}</p>
             )}
-            <div className="mt-4 flex flex-wrap items-end gap-x-3 gap-y-1">
+            <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <RepScore value={user.rep} className="text-[36px] font-medium leading-none" />
-              <span className="rounded-full border border-hd-indigo/40 bg-hd-indigo-surface px-2 py-0.5 font-mono text-[13px] text-hd-indigo-tint">
-                {user.rankPercentile}
-              </span>
+              {rankLabel ? (
+                <span className="rounded-full border border-hd-indigo/40 bg-hd-indigo-surface px-2 py-0.5 font-mono text-[13px] text-hd-indigo-tint">
+                  {rankLabel}
+                </span>
+              ) : null}
             </div>
             <div className="mt-3">
               <SocialLinkRow
@@ -85,17 +101,27 @@ export function DevProfileHeader({
             </Link>
           ) : (
             <>
-              <button
-                type="button"
-                disabled={followBusy || !onFollowToggle}
-                onClick={() => onFollowToggle?.()}
-                className="rounded-full border border-hd-border px-4 py-2 text-sm font-medium text-hd-text transition-colors duration-150 ease-out hover:border-hd-border-hover disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {following ? 'Unfollow' : 'Follow'}
-              </button>
+              {signInFollowDest ? (
+                <Link
+                  to="/login"
+                  state={{ returnTo: signInFollowDest }}
+                  className="rounded-full border border-hd-border bg-hd-indigo px-4 py-2 text-center text-sm font-medium text-white transition-colors duration-150 ease-out hover:bg-hd-indigo-hover"
+                >
+                  Sign in to follow
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  disabled={followBusy || !onFollowToggle}
+                  onClick={() => onFollowToggle?.()}
+                  className="rounded-full border border-hd-border px-4 py-2 text-sm font-medium text-hd-text transition-colors duration-150 ease-out hover:border-hd-border-hover disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {following ? 'Unfollow' : 'Follow'}
+                </button>
+              )}
               <Link
                 to={`/u/${user.username}#pinned`}
-                className="rounded-full border border-hd-border px-4 py-2 text-center text-sm font-medium text-hd-secondary transition-colors duration-150 ease-out hover:border-hd-border-hover hover:text-hd-text"
+                className="rounded-full border border-hd-border px-4 py-2 text-center text-sm font-medium text-hd-text transition-colors duration-150 ease-out hover:border-hd-border-hover"
               >
                 View solutions
               </Link>

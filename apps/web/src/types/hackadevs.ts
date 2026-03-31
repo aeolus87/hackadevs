@@ -29,6 +29,13 @@ export type Challenge = {
 
 export type SelfDeclaredLevel = 'JUNIOR' | 'MID' | 'SENIOR'
 
+export type AvailabilityStatusUi =
+  | 'UNSPECIFIED'
+  | 'OPEN_TO_WORK'
+  | 'EMPLOYED'
+  | 'NOT_LOOKING'
+  | 'FREELANCE_OPEN'
+
 export type PlatformTier =
   | 'NOVICE'
   | 'APPRENTICE'
@@ -49,6 +56,7 @@ export type DevUser = {
   rankPercentile: string
   tier: DevTier
   selfDeclaredLevel?: SelfDeclaredLevel
+  availabilityStatus?: AvailabilityStatusUi
   platformTier: PlatformTier
   staff?: boolean
   topCategory: ChallengeCategory

@@ -1,4 +1,7 @@
+import { customAlphabet } from 'nanoid'
+
 const NON_SLUG = /[^a-z0-9]+/g
+const suffix = customAlphabet('abcdefghijklmnopqrstuvwxyz0123456789', 6)
 
 export function slugifyTitle(title: string): string {
   const base = title
@@ -9,8 +12,13 @@ export function slugifyTitle(title: string): string {
   return base || 'challenge'
 }
 
-export function uniqueChallengeSlug(title: string, suffix?: string): string {
+export function slugify(title: string): string {
   const base = slugifyTitle(title)
-  if (!suffix) return base
-  return `${base}-${suffix}`
+  return `${base}-${suffix()}`
+}
+
+export function uniqueChallengeSlug(title: string, suffixPart?: string): string {
+  const base = slugifyTitle(title)
+  if (!suffixPart) return base
+  return `${base}-${suffixPart}`
 }

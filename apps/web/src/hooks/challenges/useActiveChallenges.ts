@@ -3,6 +3,7 @@ import { axiosInstance } from '@/utils/axios.instance'
 import { CHALLENGES } from '@/utils/api.routes'
 import { parseAxiosError } from '@/utils/axios-message'
 import type { Challenge } from '@/types/hackadevs-api.types'
+import { unwrapSuccessData } from '@/lib/api-unwrap'
 
 function extractList(raw: unknown): Challenge[] {
   if (Array.isArray(raw)) return raw as Challenge[]
@@ -23,8 +24,8 @@ export function useActiveChallenges() {
     setLoading(true)
     setError(null)
     try {
-      const res = await axiosInstance.get(CHALLENGES.ACTIVE())
-      setData(extractList(res.data))
+      const res = await axiosInstance.get<unknown>(CHALLENGES.ACTIVE())
+      setData(extractList(unwrapSuccessData(res.data)))
     } catch (e) {
       setError(parseAxiosError(e).message)
       setData(null)

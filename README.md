@@ -1,5 +1,21 @@
 # hackadevs
 
+```text
+  ███╗   ███╗ █████╗  ██████╗██╗  ██╗ █████╗ ██████╗ ███████╗██╗   ██╗███████╗
+  ████╗ ████║██╔══██╗██╔════╝██║ ██╔╝██╔══██╗██╔══██╗██╔════╝██║   ██║██╔════╝
+  ██╔████╔██║███████║██║     █████╔╝ ███████║██║  ██║█████╗  ██║   ██║███████╗
+  ██║╚██╔╝██║██╔══██║██║     ██╔═██╗ ██╔══██║██║  ██║██╔══╝  ╚██╗ ██╔╝╚════██║
+  ██║ ╚═╝ ██║██║  ██║╚██████╗██║  ██╗██║  ██║██████╔╝███████╗ ╚████╔╝ ███████║
+  ╚═╝     ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚══════╝  ╚═══╝  ╚══════╝
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  gogogogo — ship the solve · earn the rep · own the streak              │
+  │  vision: fair votes, weekly prompts, momentum for builders who ship      │
+  └─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Hackadevs** is a home for developers who want momentum: weekly challenges, fair peer votes, and reputation that reflects real craft—not vanity metrics. Pick a prompt, run tests, submit, vote, climb. **Go go go.**
+
 pnpm monorepo: Fastify API (`apps/server`), Vite + React (`apps/web`), shared packages (`packages/*`).
 
 ## Requirements

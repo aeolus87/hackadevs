@@ -32,10 +32,7 @@ const CATEGORY_TAB_LABEL: Record<Category, string> = {
 export default function ChallengesPage() {
   const [category, setCategory] = useState<Category | 'ALL'>('ALL')
 
-  const tabLabels = useMemo(
-    () => ['All', ...CATEGORY_ORDER.map((c) => CATEGORY_TAB_LABEL[c])],
-    [],
-  )
+  const tabLabels = useMemo(() => ['All', ...CATEGORY_ORDER.map((c) => CATEGORY_TAB_LABEL[c])], [])
 
   const tabValue = category === 'ALL' ? 'All' : CATEGORY_TAB_LABEL[category]
 
@@ -65,9 +62,7 @@ export default function ChallengesPage() {
         </p>
       </div>
       <div>
-        <p className="mb-2 font-mono text-[11px] uppercase tracking-wide text-hd-muted">
-          Category
-        </p>
+        <p className="mb-2 font-mono text-[11px] uppercase tracking-wide text-hd-muted">Category</p>
         <CategoryTabBar
           tabs={tabLabels}
           value={tabValue}

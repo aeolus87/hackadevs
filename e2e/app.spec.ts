@@ -8,12 +8,12 @@ test.describe('public pages', () => {
 
   test('login loads', async ({ page }) => {
     await page.goto('/login')
-    await expect(page.getByRole('heading', { name: /sign in to hackadevs/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /^sign in$/i })).toBeVisible()
   })
 
   test('register loads', async ({ page }) => {
     await page.goto('/register')
-    await expect(page.getByRole('heading', { name: /join hackadevs/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /^create account$/i })).toBeVisible()
   })
 
   test('leaderboard loads', async ({ page }) => {
@@ -23,7 +23,7 @@ test.describe('public pages', () => {
 
   test('challenges index loads', async ({ page }) => {
     await page.goto('/challenges')
-    await expect(page.getByRole('heading', { name: /^challenges$/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /^challenge catalog$/i })).toBeVisible()
   })
 
   test('challenge detail resolves for seeded slug', async ({ page }) => {

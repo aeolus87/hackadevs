@@ -1,11 +1,4 @@
-type NavIconName =
-  | 'feed'
-  | 'leaderboard'
-  | 'challenges'
-  | 'settings'
-  | 'user'
-  | 'chart'
-  | 'grid'
+type NavIconName = 'feed' | 'leaderboard' | 'challenges' | 'settings' | 'user' | 'chart' | 'grid'
 
 type NavIconProps = {
   name: NavIconName

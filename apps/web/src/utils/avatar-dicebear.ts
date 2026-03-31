@@ -1,4 +1,10 @@
-export const DICEBEAR_STYLES = ['avataaars', 'notionists', 'bottts', 'fun-emoji', 'lorelei'] as const
+export const DICEBEAR_STYLES = [
+  'avataaars',
+  'notionists',
+  'bottts',
+  'fun-emoji',
+  'lorelei',
+] as const
 
 export type DicebearStyle = (typeof DICEBEAR_STYLES)[number]
 

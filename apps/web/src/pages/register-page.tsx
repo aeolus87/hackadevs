@@ -102,11 +102,7 @@ export default function RegisterPage() {
           <p className="mt-1 font-mono text-[10px] text-hd-muted">Minimum 10 characters</p>
         </div>
         {error ? <InlineError message={error} /> : null}
-        <button
-          type="submit"
-          disabled={loading}
-          className={authPrimaryButtonClassName}
-        >
+        <button type="submit" disabled={loading} className={authPrimaryButtonClassName}>
           {loading ? 'Creating account…' : 'Create account'}
         </button>
       </form>

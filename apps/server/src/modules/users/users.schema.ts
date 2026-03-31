@@ -3,10 +3,7 @@ import { z } from 'zod'
 const emptyToNull = (v: unknown) => (v === '' ? null : v)
 const emptyToUndef = (v: unknown) => (v === '' ? undefined : v)
 
-const optionalHttpUrl = z.preprocess(
-  emptyToNull,
-  z.union([z.null(), z.string().url()]).optional(),
-)
+const optionalHttpUrl = z.preprocess(emptyToNull, z.union([z.null(), z.string().url()]).optional())
 
 const avatarPatch = z.preprocess(
   (v) => (v === '' ? null : v),
@@ -18,8 +15,7 @@ const avatarPatch = z.preprocess(
         .max(200000)
         .refine(
           (val) =>
-            /^https?:\/\//i.test(val) ||
-            /^data:image\/(png|jpeg|gif|webp);base64,/i.test(val),
+            /^https?:\/\//i.test(val) || /^data:image\/(png|jpeg|gif|webp);base64,/i.test(val),
           { message: 'Invalid avatar URL' },
         ),
     ])

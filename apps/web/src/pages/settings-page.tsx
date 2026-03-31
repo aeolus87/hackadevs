@@ -5,11 +5,7 @@ import { useToast } from '@/contexts/toast-context'
 import { useUpdateProfile } from '@/hooks/users/useUpdateProfile'
 import type { AvailabilityStatus, SelfLevel } from '@/types/hackadevs-api.types'
 import { HdSelect, type HdSelectOption } from '@/components/ui/hd-select'
-import {
-  DICEBEAR_STYLES,
-  dicebearAvatarUrl,
-  type DicebearStyle,
-} from '@/utils/avatar-dicebear'
+import { DICEBEAR_STYLES, dicebearAvatarUrl, type DicebearStyle } from '@/utils/avatar-dicebear'
 
 const SELF_LEVEL_OPTIONS: HdSelectOption[] = [
   { value: 'JUNIOR', label: 'Junior' },
@@ -41,8 +37,7 @@ export default function SettingsPage() {
   const [websiteUrl, setWebsiteUrl] = useState('')
   const [twitterUrl, setTwitterUrl] = useState('')
   const [selfDeclaredLevel, setSelfDeclaredLevel] = useState<SelfLevel>('MID')
-  const [availabilityStatus, setAvailabilityStatus] =
-    useState<AvailabilityStatus>('UNSPECIFIED')
+  const [availabilityStatus, setAvailabilityStatus] = useState<AvailabilityStatus>('UNSPECIFIED')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [diceStyle, setDiceStyle] = useState<DicebearStyle>('notionists')
 
@@ -170,7 +165,12 @@ export default function SettingsPage() {
                 </button>
                 <label className="cursor-pointer rounded-full border border-hd-border bg-hd-surface px-3 py-1.5 text-xs font-medium text-hd-text hover:bg-hd-hover">
                   Upload
-                  <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="sr-only" onChange={onAvatarFile} />
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    className="sr-only"
+                    onChange={onAvatarFile}
+                  />
                 </label>
                 <button
                   type="button"

@@ -80,11 +80,7 @@ export default function LoginPage() {
           />
         </div>
         {error ? <InlineError message={error} /> : null}
-        <button
-          type="submit"
-          disabled={loading}
-          className={authPrimaryButtonClassName}
-        >
+        <button type="submit" disabled={loading} className={authPrimaryButtonClassName}>
           {loading ? 'Signing in…' : 'Sign in'}
         </button>
       </form>

@@ -46,7 +46,9 @@ export function MobileTabBar() {
         aria-label={isAuthenticated ? 'Profile' : 'Account'}
       >
         <NavIcon name="user" className="h-5 w-5 shrink-0" />
-        <span className="max-w-full truncate px-0.5">{isAuthenticated ? 'Profile' : 'Account'}</span>
+        <span className="max-w-full truncate px-0.5">
+          {isAuthenticated ? 'Profile' : 'Account'}
+        </span>
       </NavLink>
       {isAuthenticated && (
         <NavLink

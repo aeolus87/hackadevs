@@ -127,10 +127,20 @@ const SEED_SOLUTION_CODE: Record<string, string> = {
   return JSON.stringify(s)
 }
 `,
-  'fetch-health-json': `export function solve(input: string): string {
-  const { uptimeSec } = JSON.parse(input) as { uptimeSec: number }
-  return JSON.stringify({ status: 'ok', uptimeSec })
+  'fetch-health-json': `// @ts-nocheck
+const fs = require('fs')
+
+type HealthInput = { uptimeSec: number }
+type HealthJson = { status: 'ok'; uptimeSec: number }
+
+function solve(input: string): string {
+  const { uptimeSec } = JSON.parse(input) as HealthInput
+  const body: HealthJson = { status: 'ok', uptimeSec }
+  return JSON.stringify(body)
 }
+
+const input = fs.readFileSync(0, 'utf8')
+process.stdout.write(solve(input.trim()))
 `,
   'rate-limiter-redis-failover': `export function solve(input: string): string {
   return JSON.stringify({ approach: 'seed', slidingWindow: true, input })

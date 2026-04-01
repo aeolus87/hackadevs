@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { AdminPatchChallengeBody } from '@hackadevs/core'
 import { HdSelect } from '@/components/ui/hd-select'
 import type { Category, ChallengeStatus } from '@/types/hackadevs-api.types'
 import { useAdminChallenge } from '@/hooks/admin/useAdminChallenge'
@@ -45,6 +46,7 @@ type AdminChallengeEditDrawerProps = {
   open: boolean
   onClose: () => void
   onSaved: () => void
+  canWrite: boolean
 }
 
 export function AdminChallengeEditDrawer({
@@ -52,6 +54,7 @@ export function AdminChallengeEditDrawer({
   open,
   onClose,
   onSaved,
+  canWrite,
 }: AdminChallengeEditDrawerProps) {
   const { data: detail, loading, refetch } = useAdminChallenge(open ? challengeId : null)
   const { mutate: patch, loading: saving } = useUpdateChallenge(() => {
@@ -111,9 +114,9 @@ export function AdminChallengeEditDrawer({
     .map((t) => t.trim())
     .filter(Boolean)
 
-  const buildBody = (status?: ChallengeStatus) => {
+  const buildBody = (status?: ChallengeStatus): AdminPatchChallengeBody => {
     const cons = constraints.map((c) => c.trim()).filter(Boolean)
-    const body: Record<string, unknown> = {
+    const body: AdminPatchChallengeBody = {
       title,
       category,
       difficulty,
@@ -154,9 +157,14 @@ export function AdminChallengeEditDrawer({
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-4 py-4">
+          {!canWrite && (
+            <p className="mb-4 rounded-lg border border-hd-amber/30 bg-hd-amber/10 px-3 py-2 text-sm text-hd-amber">
+              View only — publishing and edits require an administrator.
+            </p>
+          )}
           {loading && !detail && <p className="text-sm text-hd-muted">Loading…</p>}
           {detail && (
-            <div className="space-y-4">
+            <fieldset disabled={!canWrite} className="min-h-0 space-y-4 border-0 p-0">
               <label className="block">
                 <span className="text-xs text-hd-muted">Title</span>
                 <input
@@ -348,13 +356,13 @@ export function AdminChallengeEditDrawer({
                   Add test case
                 </button>
               </div>
-            </div>
+            </fieldset>
           )}
         </div>
         <div className="flex flex-wrap gap-2 border-t border-hd-border p-4">
           <button
             type="button"
-            disabled={saving || !detail}
+            disabled={!canWrite || saving || !detail}
             onClick={() => void patch(challengeId, buildBody()).then(() => refetch())}
             className="rounded-full border border-hd-border px-4 py-2 text-sm text-hd-secondary hover:bg-hd-hover disabled:opacity-40"
           >
@@ -362,7 +370,7 @@ export function AdminChallengeEditDrawer({
           </button>
           <button
             type="button"
-            disabled={saving || !detail || scheduleDisabled}
+            disabled={!canWrite || saving || !detail || scheduleDisabled}
             onClick={() => void patch(challengeId, buildBody('SCHEDULED'))}
             className="rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover disabled:opacity-40"
           >
@@ -370,7 +378,7 @@ export function AdminChallengeEditDrawer({
           </button>
           <button
             type="button"
-            disabled={publishing || !detail}
+            disabled={!canWrite || publishing || !detail}
             onClick={() => void publish(challengeId)}
             className="rounded-full bg-hd-emerald px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40"
           >

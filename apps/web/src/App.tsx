@@ -20,6 +20,10 @@ import NotificationsPage from '@/pages/notifications-page'
 import NotFoundPage from '@/pages/not-found-page'
 import AdminChallengesPage from '@/pages/admin/admin-challenges-page'
 import { StaffRoute } from '@/components/routes/staff-route'
+import { PortalSessionGate } from '@/components/routes/portal-session-gate'
+import PortalRegisterPage from '@/pages/portal/portal-register-page'
+import PortalDashboardPage from '@/pages/portal/portal-dashboard-page'
+import PortalSubmitPage from '@/pages/portal/portal-submit-page'
 
 function Shell({ children }: { children: ReactNode }) {
   return (
@@ -40,6 +44,23 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
+            <Route path="/portal/register" element={<PortalRegisterPage />} />
+            <Route
+              path="/portal/dashboard"
+              element={
+                <PortalSessionGate>
+                  <PortalDashboardPage />
+                </PortalSessionGate>
+              }
+            />
+            <Route
+              path="/portal/submit"
+              element={
+                <PortalSessionGate>
+                  <PortalSubmitPage />
+                </PortalSessionGate>
+              }
+            />
             <Route
               path="/feed"
               element={

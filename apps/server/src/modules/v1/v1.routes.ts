@@ -22,7 +22,7 @@ import {
   updateChallenge,
 } from '../challenges/challenges.service.js'
 import { createSubmissionsService } from '../submissions/submissions.service.js'
-import { saveDraftSchema } from '../submissions/submissions.schema.js'
+import { completeFollowUpSchema, saveDraftSchema } from '../submissions/submissions.schema.js'
 import { createVotesService } from '../votes/votes.service.js'
 import { castVoteSchema } from '../votes/votes.schema.js'
 import { createLeaderboardService } from '../leaderboard/leaderboard.service.js'
@@ -307,6 +307,54 @@ export const createV1Routes = (opts: V1RouteOpts): FastifyPluginAsync => {
       },
     )
 
+    f.post<{ Params: { id: string } }>(
+      '/submissions/:id/resume-followup',
+      { preHandler: authMw },
+      async (req, reply) => {
+        try {
+          const r = await submissionsApi.resumeFlaggedToFollowUp(req.params.id, req.jwtUser!.sub)
+          return sendSuccess(reply, r)
+        } catch (e) {
+          return handleErr(reply, e)
+        }
+      },
+    )
+
+    f.post<{ Params: { id: string } }>(
+      '/submissions/:id/withdraw-for-revision',
+      { preHandler: authMw },
+      async (req, reply) => {
+        try {
+          const sub = await submissionsApi.withdrawPublishedForRevision(
+            req.params.id,
+            req.jwtUser!.sub,
+          )
+          return sendSuccess(reply, sub)
+        } catch (e) {
+          return handleErr(reply, e)
+        }
+      },
+    )
+
+    f.post<{ Params: { id: string } }>(
+      '/submissions/:id/follow-up',
+      { preHandler: authMw },
+      async (req, reply) => {
+        const parsed = completeFollowUpSchema.safeParse(req.body)
+        if (!parsed.success) return sendError(reply, 400, 'Invalid body')
+        try {
+          const r = await submissionsApi.completeFollowUp(
+            req.params.id,
+            req.jwtUser!.sub,
+            parsed.data,
+          )
+          return sendSuccess(reply, r)
+        } catch (e) {
+          return handleErr(reply, e)
+        }
+      },
+    )
+
     f.get<{ Params: { challengeId: string } }>(
       '/submissions/challenge/:challengeId',
       async (req, reply) => {
@@ -574,6 +622,19 @@ export const createV1Routes = (opts: V1RouteOpts): FastifyPluginAsync => {
       const data = await adminApi.analytics()
       return sendSuccess(reply, data)
     })
+
+    f.post<{ Params: { id: string } }>(
+      '/admin/portals/:id/approve',
+      { preHandler: adminMw },
+      async (req, reply) => {
+        try {
+          const row = await adminApi.approveCompanyPortal(req.params.id)
+          return sendSuccess(reply, row)
+        } catch (e) {
+          return handleErr(reply, e)
+        }
+      },
+    )
 
     f.post('/portal/register', async (req, reply) => {
       const parsed = registerPortalSchema.safeParse(req.body)

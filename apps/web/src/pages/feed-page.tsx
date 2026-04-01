@@ -19,11 +19,6 @@ import type { Category } from '@/types/hackadevs-api.types'
 
 const filters = ['This week', 'Trending', 'My tags', 'Beginner'] as const
 
-const weekTheme = {
-  title: 'Cold start',
-  body: 'Warmup challenges are live first — grab an easy one, then level up.',
-}
-
 export default function FeedPage() {
   const { data: myRank } = useMyRank()
   const { user, isAuthenticated } = useAuthUser()
@@ -57,6 +52,10 @@ export default function FeedPage() {
     refetch: refetchList,
   } = useChallenges(listParams)
   const { data: activeList, loading: activeLoading } = useActiveChallenges()
+  const weeklyThemeFromApi = useMemo(() => {
+    const t = activeList?.[0]?.weekTheme?.trim()
+    return t && t.length > 0 ? t : null
+  }, [activeList])
   const { data: topWeekBoard, loading: topWeekLoading } = useGlobalLeaderboard({
     page: 1,
     limit: 25,
@@ -141,8 +140,15 @@ export default function FeedPage() {
           <p className="font-mono text-[11px] uppercase tracking-wide text-hd-indigo-tint">
             This week&apos;s theme
           </p>
-          <h3 className="mt-2 text-base font-medium text-hd-text">{weekTheme.title}</h3>
-          <p className="mt-2 text-sm text-hd-secondary">{weekTheme.body}</p>
+          {weeklyThemeFromApi ? (
+            <p className="mt-2 text-sm leading-relaxed text-hd-secondary">{weeklyThemeFromApi}</p>
+          ) : (
+            <p className="mt-2 text-sm text-hd-muted">
+              {activeLoading
+                ? 'Loading…'
+                : 'No weekly theme on active challenges yet — check back after the next publish.'}
+            </p>
+          )}
         </div>
         <div className="rounded-[12px] border border-hd-border bg-hd-card p-5">
           <div className="mb-3 flex items-center gap-2 text-hd-amber">

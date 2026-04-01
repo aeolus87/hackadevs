@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { unwrapSuccessData } from '@/lib/api-unwrap'
 import { axiosInstance } from '@/utils/axios.instance'
 import { SUBMISSIONS } from '@/utils/api.routes'
 import { parseAxiosError } from '@/utils/axios-message'
@@ -17,8 +18,9 @@ export function useSubmission(submissionId: string) {
     setLoading(true)
     setError(null)
     try {
-      const res = await axiosInstance.get<Submission>(SUBMISSIONS.GET(submissionId))
-      setData(res.data)
+      const res = await axiosInstance.get(SUBMISSIONS.GET(submissionId))
+      const row = unwrapSuccessData<Submission>(res.data)
+      setData(row)
     } catch (e) {
       const { message, status } = parseAxiosError(e)
       setError(message)

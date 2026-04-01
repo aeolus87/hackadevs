@@ -7,7 +7,7 @@ import type { DevUser } from '@/types/hackadevs-api.types'
 import { unwrapSuccessData } from '@/lib/api-unwrap'
 
 export function useMe() {
-  const { token, setUser } = useAuth()
+  const { token, setUser, clearSession } = useAuth()
   const [data, setData] = useState<DevUser | null>(null)
   const [loading, setLoading] = useState(!!token)
   const [error, setError] = useState<string | null>(null)
@@ -27,11 +27,16 @@ export function useMe() {
       setData(user)
       setUser(user)
     } catch (e) {
-      setError(parseAxiosError(e).message)
+      const { message, status } = parseAxiosError(e)
+      if (status === 401 || status === 403) {
+        clearSession()
+        setData(null)
+      }
+      setError(message)
     } finally {
       setLoading(false)
     }
-  }, [token, setUser])
+  }, [token, setUser, clearSession])
 
   useEffect(() => {
     void refetch()

@@ -12,3 +12,14 @@ export const saveDraftSchema = z.object({
 })
 
 export type SaveDraftBody = z.infer<typeof saveDraftSchema>
+
+export const completeFollowUpSchema = z.object({
+  answers: z.array(
+    z.object({
+      id: z.string().min(1),
+      text: z.string().min(15).max(8000),
+    }),
+  ),
+})
+
+export type CompleteFollowUpBody = z.infer<typeof completeFollowUpSchema>

@@ -3,7 +3,6 @@ import { useAuthUser } from '@/contexts/auth-context'
 import { useUnreadCount } from '@/hooks/notifications/useUnreadCount'
 import { useSubmitSolutionHref } from '@/hooks/challenges/useSubmitSolutionHref'
 import { HackaDevsMark } from '@/components/layout/hackadevs-mark'
-import { GlobalSearch } from '@/components/layout/global-search'
 
 export function TopBar() {
   const { isAuthenticated } = useAuthUser()
@@ -25,12 +24,8 @@ export function TopBar() {
         </span>
       </Link>
 
-      <div className="flex min-w-0 flex-1 items-center justify-start md:justify-center">
-        <GlobalSearch />
-      </div>
-
       {isAuthenticated ? (
-        <div className="flex shrink-0 items-center gap-1.5 rounded-2xl border border-hd-border/60 bg-hd-surface/50 p-1 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5 rounded-2xl border border-hd-border/60 bg-hd-surface/50 p-1 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
           <Link
             to="/notifications"
             className="relative flex h-9 w-9 items-center justify-center rounded-xl text-hd-secondary transition-colors duration-150 ease-out hover:bg-hd-hover hover:text-hd-text"
@@ -55,8 +50,8 @@ export function TopBar() {
             to={submit.href}
             title={
               submit.hasActive
-                ? `Submit a solution — next closing: ${submit.challengeTitle ?? ''}`
-                : 'No active challenge window — open the catalog to pick one'
+                ? `Submit a solution${submit.challengeTitle ? ` — ${submit.challengeTitle}` : ''}`
+                : 'Open a challenge from the feed, then submit from its page'
             }
             className="hidden rounded-xl bg-hd-indigo px-3 py-2 text-xs font-semibold text-white transition-colors duration-150 ease-out hover:bg-hd-indigo-hover sm:inline-flex sm:items-center sm:justify-center"
           >

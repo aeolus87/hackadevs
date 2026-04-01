@@ -89,11 +89,63 @@ export default function ChallengeDetailPage() {
           </Link>
         </div>
       )}
-      {isAuthenticated && mine && mine.status !== 'DRAFT' && mine.status !== 'WITHDRAWN' && (
-        <div className="mb-4 rounded-[12px] border border-hd-indigo/30 bg-hd-indigo-surface px-4 py-3 text-sm text-hd-secondary">
-          You already submitted this challenge.
+      {isAuthenticated && mine?.status === 'AWAITING_FOLLOWUP' && (
+        <div className="mb-4 rounded-[12px] border border-hd-amber/30 bg-hd-amber/10 px-4 py-3 text-sm text-hd-secondary">
+          Verification required — answer two short questions about your code before your solution is
+          published.{' '}
+          <Link
+            to={`/challenge/${challenge.slug}/submit`}
+            className="font-medium text-hd-indigo-tint hover:text-hd-indigo-hover"
+          >
+            Continue
+          </Link>
         </div>
       )}
+      {isAuthenticated && mine && mine.status === 'PUBLISHED' && mine.id && (
+        <div className="mb-4 rounded-[12px] border border-hd-indigo/30 bg-hd-indigo-surface px-4 py-3 text-sm text-hd-secondary">
+          <span className="text-hd-text">Your solution is live.</span>{' '}
+          {mine.testScore != null && (
+            <span className="font-mono text-[12px] text-hd-muted">
+              Tests {Math.round(mine.testScore)}%
+              {mine.rationaleScore != null ? ` · Rationale ${mine.rationaleScore}/100` : ''}
+            </span>
+          )}{' '}
+          <Link
+            to={`/challenge/${challenge.slug}/solutions/${mine.id}`}
+            className="font-medium text-hd-indigo-tint hover:text-hd-indigo-hover"
+          >
+            Open your solution
+          </Link>
+          {apiCh?.status === 'ACTIVE' &&
+            apiCh.closesAt != null &&
+            new Date(apiCh.closesAt) > new Date() && (
+              <>
+                {' '}
+                ·{' '}
+                <Link
+                  to={`/challenge/${challenge.slug}/submit`}
+                  className="font-medium text-hd-amber hover:text-hd-amber/90"
+                >
+                  Revise before close
+                </Link>
+              </>
+            )}
+        </div>
+      )}
+      {isAuthenticated &&
+        mine &&
+        mine.status !== 'DRAFT' &&
+        mine.status !== 'WITHDRAWN' &&
+        mine.status !== 'AWAITING_FOLLOWUP' &&
+        mine.status !== 'PUBLISHED' && (
+          <div className="mb-4 rounded-[12px] border border-hd-border bg-hd-card px-4 py-3 text-sm text-hd-secondary">
+            {mine.status === 'EVALUATED'
+              ? 'Your submission was scored but did not reach the publish threshold.'
+              : mine.status === 'FLAGGED'
+                ? 'Open submit to continue — verification questions are next (rationale already scored).'
+                : 'You have a submission on this challenge.'}
+          </div>
+        )}
       <div className="rounded-[16px] border border-hd-border bg-hd-indigo-surface px-4 py-6 md:px-8 md:py-8">
         <nav className="mb-4 font-mono text-[12px] text-hd-muted">
           <Link to="/feed" className="text-hd-secondary hover:text-hd-text">
@@ -133,13 +185,19 @@ export default function ChallengeDetailPage() {
         )}
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
-            to={isAuthenticated ? `/challenge/${challenge.slug}/submit` : '/login'}
+            to={
+              isAuthenticated
+                ? mine?.status === 'PUBLISHED' && mine.id
+                  ? `/challenge/${challenge.slug}/solutions/${mine.id}`
+                  : `/challenge/${challenge.slug}/submit`
+                : '/login'
+            }
             state={
               isAuthenticated ? undefined : { returnTo: `/challenge/${challenge.slug}/submit` }
             }
             className="inline-flex h-11 items-center justify-center rounded-full bg-hd-indigo px-8 text-sm font-medium text-white transition-colors duration-150 ease-out hover:bg-hd-indigo-hover"
           >
-            Start solving
+            {isAuthenticated && mine?.status === 'PUBLISHED' ? 'Your solution' : 'Start solving'}
           </Link>
           <Link
             to={`/challenge/${challenge.slug}/solutions`}
@@ -155,6 +213,37 @@ export default function ChallengeDetailPage() {
           <ChallengeDetail challenge={challenge} />
         </div>
         <aside className="w-full space-y-4 lg:sticky lg:top-24 lg:w-[40%] lg:max-w-md lg:self-start">
+          {isAuthenticated && mine?.status === 'PUBLISHED' && mine.id ? (
+            <div className="rounded-[12px] border border-hd-indigo/30 bg-hd-indigo-surface p-5">
+              <h3 className="mb-3 text-sm font-medium text-hd-text">Your entry</h3>
+              <dl className="space-y-2 font-mono text-[12px] text-hd-secondary">
+                <div className="flex justify-between gap-2">
+                  <dt>Tests</dt>
+                  <dd className="text-hd-text">
+                    {mine.testScore != null ? `${Math.round(mine.testScore)}%` : '—'}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt>Rationale</dt>
+                  <dd className="text-hd-text">
+                    {mine.rationaleScore != null ? `${mine.rationaleScore}/100` : '—'}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt>Composite</dt>
+                  <dd className="text-hd-text">
+                    {mine.compositeScore != null ? mine.compositeScore.toFixed(1) : '—'}
+                  </dd>
+                </div>
+              </dl>
+              <Link
+                to={`/challenge/${challenge.slug}/solutions/${mine.id}`}
+                className="mt-4 inline-flex text-sm font-medium text-hd-indigo-tint hover:text-hd-indigo-hover"
+              >
+                View solution →
+              </Link>
+            </div>
+          ) : null}
           <div className="rounded-[12px] border border-hd-border bg-hd-card p-5">
             <h3 className="mb-4 text-sm font-medium text-hd-text">Submission stats</h3>
             {submissionLangSlices.length > 0 ? (
@@ -205,12 +294,31 @@ export default function ChallengeDetailPage() {
       >
         <h2 className="text-base font-medium text-hd-text">Discussion</h2>
         <p className="mt-2 text-sm text-hd-muted">No comments yet. Start the thread.</p>
-        <Link
-          to={`/challenge/${challenge.slug}/submit`}
-          className="mt-4 inline-flex rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover"
-        >
-          Submit the first solution
-        </Link>
+        {isAuthenticated && mine?.status === 'PUBLISHED' && mine.id ? (
+          <Link
+            to={`/challenge/${challenge.slug}/solutions/${mine.id}`}
+            className="mt-4 inline-flex rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover"
+          >
+            View your solution
+          </Link>
+        ) : isAuthenticated && mine?.status === 'DRAFT' ? (
+          <Link
+            to={`/challenge/${challenge.slug}/submit`}
+            className="mt-4 inline-flex rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover"
+          >
+            Resume your draft
+          </Link>
+        ) : (
+          <Link
+            to={isAuthenticated ? `/challenge/${challenge.slug}/submit` : '/login'}
+            state={
+              isAuthenticated ? undefined : { returnTo: `/challenge/${challenge.slug}/submit` }
+            }
+            className="mt-4 inline-flex rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover"
+          >
+            Submit a solution
+          </Link>
+        )}
       </section>
     </div>
   )

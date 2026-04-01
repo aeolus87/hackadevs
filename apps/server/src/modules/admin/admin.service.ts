@@ -240,5 +240,16 @@ export function createAdminService(prisma: PrismaClient) {
         data: { deletedAt: new Date() },
       })
     },
+
+    async approveCompanyPortal(portalId: string) {
+      const p = await prisma.companyPortal.findFirst({
+        where: { id: portalId, deletedAt: null },
+      })
+      if (!p) throw Object.assign(new Error('not_found'), { statusCode: 404 })
+      return prisma.companyPortal.update({
+        where: { id: portalId },
+        data: { isApproved: true },
+      })
+    },
   }
 }

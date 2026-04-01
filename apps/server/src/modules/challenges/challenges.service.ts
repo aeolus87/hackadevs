@@ -150,7 +150,7 @@ export async function closeChallenge(prisma: PrismaClient, id: string) {
     where: {
       challengeId: id,
       deletedAt: null,
-      status: { in: ['DRAFT', 'SUBMITTED', 'EVALUATED', 'PUBLISHED'] },
+      status: { in: ['DRAFT', 'SUBMITTED', 'AWAITING_FOLLOWUP', 'EVALUATED', 'PUBLISHED'] },
     },
     distinct: ['userId'],
     select: { userId: true },

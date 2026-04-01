@@ -47,6 +47,10 @@ export const SUBMISSIONS = {
   CREATE: () => `${V1}/submissions`,
   RUN: (id: string) => `${V1}/submissions/${encodeURIComponent(id)}/run`,
   SUBMIT: (id: string) => `${V1}/submissions/${encodeURIComponent(id)}/submit`,
+  RESUME_FOLLOWUP: (id: string) => `${V1}/submissions/${encodeURIComponent(id)}/resume-followup`,
+  WITHDRAW_FOR_REVISION: (id: string) =>
+    `${V1}/submissions/${encodeURIComponent(id)}/withdraw-for-revision`,
+  FOLLOW_UP: (id: string) => `${V1}/submissions/${encodeURIComponent(id)}/follow-up`,
   GET: (id: string) => `${V1}/submissions/${encodeURIComponent(id)}`,
   MINE_BY_CHALLENGE: (challengeId: string) =>
     `${V1}/submissions/mine/challenge/${encodeURIComponent(challengeId)}`,
@@ -84,4 +88,11 @@ export const ADMIN = {
   CHALLENGE: (id: string) => `${V1}/admin/challenges/${encodeURIComponent(id)}`,
   PUBLISH: (id: string) => `${V1}/admin/challenges/${encodeURIComponent(id)}/publish`,
   GENERATE: () => `${V1}/admin/challenges/generate`,
+}
+
+export const PORTAL = {
+  REGISTER: () => `${V1}/portal/register`,
+  CHALLENGES: () => `${V1}/portal/challenges`,
+  BOOKMARK: (submissionId: string) => `${V1}/portal/bookmark/${encodeURIComponent(submissionId)}`,
+  BOOKMARKS: () => `${V1}/portal/bookmarks`,
 }

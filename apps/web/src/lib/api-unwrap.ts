@@ -8,5 +8,5 @@ export function unwrapSuccessData<T>(body: unknown): T {
   ) {
     return (body as { data: T }).data
   }
-  return body as T
+  throw new Error('Invalid API response envelope')
 }

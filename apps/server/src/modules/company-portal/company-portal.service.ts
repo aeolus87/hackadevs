@@ -9,9 +9,14 @@ async function getPortalByHeaders(
   secret: string | undefined,
 ) {
   if (!portalId || !secret) return null
-  return prisma.companyPortal.findFirst({
+  const portal = await prisma.companyPortal.findFirst({
     where: { id: portalId, portalSecret: secret, deletedAt: null },
   })
+  if (!portal) return null
+  if (!portal.isApproved) {
+    throw Object.assign(new Error('portal_not_approved'), { statusCode: 403 })
+  }
+  return portal
 }
 
 export function createCompanyPortalService(prisma: PrismaClient) {
@@ -26,6 +31,7 @@ export function createCompanyPortalService(prisma: PrismaClient) {
           contactName: body.contactName,
           contactEmail: body.contactEmail.toLowerCase(),
           portalSecret,
+          isApproved: false,
         },
       })
       return { portalId: portal.id, portalSecret, portal }

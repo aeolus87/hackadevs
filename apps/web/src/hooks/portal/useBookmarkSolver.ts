@@ -1,27 +1,29 @@
 import { useCallback, useState } from 'react'
 import { axiosInstance } from '@/utils/axios.instance'
-import { ADMIN } from '@/utils/api.routes'
+import { PORTAL } from '@/utils/api.routes'
 import { parseAxiosError } from '@/utils/axios-message'
 import { unwrapSuccessData } from '@/lib/api-unwrap'
-import type { AdminPatchChallengeBody } from '@hackadevs/core'
-import type { AdminChallengeDetail } from './useAdminChallenge'
+import { getPortalHeaders } from '@/lib/portal-storage'
 
-export function useUpdateChallenge(onSuccess?: () => void) {
+export function useBookmarkSolver(onSuccess?: () => void) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const mutate = useCallback(
-    async (id: string, body: AdminPatchChallengeBody) => {
+    async (submissionId: string) => {
       setLoading(true)
       setError(null)
       try {
-        const res = await axiosInstance.patch<unknown>(ADMIN.CHALLENGE(id), body)
-        const ch = unwrapSuccessData<AdminChallengeDetail>(res.data)
+        const res = await axiosInstance.post<unknown>(
+          PORTAL.BOOKMARK(submissionId),
+          {},
+          { headers: getPortalHeaders() },
+        )
+        unwrapSuccessData<{ ok: true }>(res.data)
         onSuccess?.()
-        return ch
       } catch (e) {
-        const msg = parseAxiosError(e).message
-        setError(msg)
+        const { message } = parseAxiosError(e)
+        setError(message)
         throw e
       } finally {
         setLoading(false)

@@ -17,6 +17,10 @@ const DEFAULT_BODY = {
   memory_limit: 262144,
 }
 
+function judge0Err(message: string, statusCode: number) {
+  return Object.assign(new Error(message), { statusCode })
+}
+
 export type Judge0PollResult = {
   statusId: number
   stdout: string | null
@@ -34,6 +38,16 @@ export type RunWithPollingResult = {
   memoryUsedMb: number
 }
 
+type Judge0SubmissionResponse = {
+  status?: { id: number; description?: string }
+  stdout?: string | null
+  stderr?: string | null
+  time?: string | null
+  memory?: number | null
+  compile_output?: string | null
+  token?: string
+}
+
 export function createJudge0Client(apiUrl: string, apiKey?: string) {
   const base = apiUrl.replace(/\/$/, '')
   const headers: Record<string, string> = {
@@ -44,13 +58,20 @@ export function createJudge0Client(apiUrl: string, apiKey?: string) {
     headers['X-Auth-Token'] = apiKey
   }
 
-  async function runCode(params: {
-    code: string
-    language: SubmissionLanguage
-    stdin?: string
-    expectedOutput?: string
-  }): Promise<string> {
-    const res = await fetch(`${base}/submissions?base64_encoded=false&wait=false`, {
+  async function postSubmission(
+    params: {
+      code: string
+      language: SubmissionLanguage
+      stdin?: string
+      expectedOutput?: string
+    },
+    wait: boolean,
+  ): Promise<Response> {
+    const qs = new URLSearchParams({
+      base64_encoded: 'false',
+      wait: wait ? 'true' : 'false',
+    })
+    return fetch(`${base}/submissions?${qs.toString()}`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -61,17 +82,70 @@ export function createJudge0Client(apiUrl: string, apiKey?: string) {
         ...DEFAULT_BODY,
       }),
     })
-    if (!res.ok) throw new Error(`Judge0 submit failed: ${res.status}`)
-    const j = (await res.json()) as { token: string }
+  }
+
+  async function parseSubmissionResponse(res: Response): Promise<Judge0SubmissionResponse> {
+    if (!res.ok) {
+      let detail = ''
+      try {
+        const errBody = (await res.json()) as { error?: string; message?: string }
+        detail = errBody?.error ?? errBody?.message ?? ''
+      } catch {
+        try {
+          detail = (await res.text()).slice(0, 200)
+        } catch {
+          detail = ''
+        }
+      }
+      throw judge0Err(
+        `Judge0 request failed: HTTP ${res.status}${detail ? ` — ${detail}` : ''}`,
+        502,
+      )
+    }
+    try {
+      return (await res.json()) as Judge0SubmissionResponse
+    } catch {
+      throw judge0Err('Judge0 returned invalid JSON', 502)
+    }
+  }
+
+  async function runCode(params: {
+    code: string
+    language: SubmissionLanguage
+    stdin?: string
+    expectedOutput?: string
+  }): Promise<string> {
+    let res: Response
+    try {
+      res = await postSubmission(params, false)
+    } catch (e) {
+      const hint = e instanceof Error ? e.message : String(e)
+      throw judge0Err(
+        `Cannot reach Judge0 at ${base} (${hint}). Start Judge0 or set JUDGE0_API_URL.`,
+        503,
+      )
+    }
+    const j = await parseSubmissionResponse(res)
+    if (!j.token) {
+      throw judge0Err('Judge0 did not return a submission token', 502)
+    }
     return j.token
   }
 
   async function getResult(token: string): Promise<Judge0PollResult> {
-    const res = await fetch(
-      `${base}/submissions/${token}?base64_encoded=false&fields=status,stdout,stderr,time,memory,compile_output`,
-      { headers },
-    )
-    if (!res.ok) throw new Error(`Judge0 poll failed: ${res.status}`)
+    let res: Response
+    try {
+      res = await fetch(
+        `${base}/submissions/${token}?base64_encoded=false&fields=status,stdout,stderr,time,memory,compile_output`,
+        { headers },
+      )
+    } catch (e) {
+      const hint = e instanceof Error ? e.message : String(e)
+      throw judge0Err(`Cannot reach Judge0 at ${base} while polling (${hint}).`, 503)
+    }
+    if (!res.ok) {
+      throw judge0Err(`Judge0 poll failed: HTTP ${res.status}`, 502)
+    }
     const j = (await res.json()) as {
       status?: { id: number }
       stdout?: string | null
@@ -90,37 +164,39 @@ export function createJudge0Client(apiUrl: string, apiKey?: string) {
     }
   }
 
+  function submissionToRunResult(j: Judge0SubmissionResponse): RunWithPollingResult {
+    const statusId = j.status?.id ?? 0
+    const timeSec = j.time ? Number.parseFloat(j.time) : 0
+    const memKb = j.memory ?? 0
+    const compile = j.compile_output != null ? String(j.compile_output) : null
+    const errText = j.stderr != null && j.stderr !== '' ? j.stderr : compile
+    return {
+      passed: statusId === 3,
+      stdout: j.stdout ?? null,
+      stderr: errText,
+      executionTimeMs: Number.isFinite(timeSec) ? Math.round(timeSec * 1000) : 0,
+      memoryUsedMb: memKb / 1024,
+    }
+  }
+
   async function runWithPolling(params: {
     code: string
     language: SubmissionLanguage
     stdin?: string
     expectedOutput?: string
   }): Promise<RunWithPollingResult> {
-    const token = await runCode(params)
-    let last: Judge0PollResult | null = null
-    for (let i = 0; i < 10; i++) {
-      last = await getResult(token)
-      if (last.statusId >= 3) break
-      await new Promise((r) => setTimeout(r, 800))
+    let res: Response
+    try {
+      res = await postSubmission(params, true)
+    } catch (e) {
+      const hint = e instanceof Error ? e.message : String(e)
+      throw judge0Err(
+        `Cannot reach Judge0 at ${base} (${hint}). Start Judge0 or set JUDGE0_API_URL.`,
+        503,
+      )
     }
-    if (!last) {
-      return {
-        passed: false,
-        stdout: null,
-        stderr: null,
-        executionTimeMs: 0,
-        memoryUsedMb: 0,
-      }
-    }
-    const timeSec = last.time ? Number.parseFloat(last.time) : 0
-    const memKb = last.memory ?? 0
-    return {
-      passed: last.statusId === 3,
-      stdout: last.stdout,
-      stderr: last.stderr,
-      executionTimeMs: Number.isFinite(timeSec) ? Math.round(timeSec * 1000) : 0,
-      memoryUsedMb: memKb / 1024,
-    }
+    const j = await parseSubmissionResponse(res)
+    return submissionToRunResult(j)
   }
 
   return { runCode, getResult, runWithPolling }

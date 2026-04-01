@@ -13,6 +13,7 @@ export type Difficulty = 'BEGINNER' | 'MEDIUM' | 'HARD' | 'LEGENDARY'
 export type SubmissionStatus =
   | 'DRAFT'
   | 'SUBMITTED'
+  | 'AWAITING_FOLLOWUP'
   | 'EVALUATED'
   | 'PUBLISHED'
   | 'FLAGGED'
@@ -146,6 +147,8 @@ export interface Submission {
   downvoteCount: number
   voteScore?: number
   submittedAt?: string
+  followUpQuestions?: { id: string; prompt: string }[]
+  followUpAnswers?: { id: string; text: string }[]
   user?: SubmissionAuthor
 }
 

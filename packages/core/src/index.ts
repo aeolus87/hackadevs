@@ -12,3 +12,9 @@ export type HealthResponse = {
   status: 'ok'
   timestamp: string
 }
+
+export {
+  adminPatchChallengeSchema,
+  generateChallengeCategorySchema,
+  type AdminPatchChallengeBody,
+} from './admin-patch-challenge.js'

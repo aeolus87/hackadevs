@@ -25,6 +25,19 @@ const RationaleOutputSchema = z.object({
   flags: z.array(z.string()),
 })
 
+const FollowUpOutputSchema = z.object({
+  questions: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        prompt: z.string().min(20).max(600),
+      }),
+    )
+    .length(2),
+})
+
+export type FollowUpQuestionItem = { id: string; prompt: string }
+
 export type ChallengeGenerationResult = z.infer<typeof ChallengeOutputSchema> & {
   estimatedDifficulty: ChallengeDifficulty
 }
@@ -39,6 +52,19 @@ const FALLBACK_SCORE: RationaleScoreResult = {
   summary: 'scoring_failed',
   flags: ['score_failed'],
 }
+
+const FALLBACK_FOLLOWUP: FollowUpQuestionItem[] = [
+  {
+    id: 'q1',
+    prompt:
+      'Point to the part of your code that enforces the main correctness constraint from the problem, and explain in one or two sentences why it cannot produce an invalid result for valid inputs.',
+  },
+  {
+    id: 'q2',
+    prompt:
+      'If the input size grew by roughly 1000×, what would become the first bottleneck in your solution, and which function or block would you change first?',
+  },
+]
 
 function getOpenAI(): OpenAI | null {
   const key = process.env.OPENAI_API_KEY
@@ -137,7 +163,6 @@ Score each dimension 0-25 (total max 100):
 - scalability: Is the scale analysis specific with real numbers, not generic?
 
 Check for these flags (include in flags[] array if true):
-- "likely_ai_generated": generic phrasing, no personal voice, perfectly structured but hollow
 - "vague_tradeoffs": tradeoffs section names no concrete alternatives or numbers
 - "no_concrete_numbers": no metrics, latencies, throughputs, or quantities anywhere in all three sections
 
@@ -158,5 +183,53 @@ Return JSON:
     return RationaleOutputSchema.parse(JSON.parse(text))
   } catch {
     return FALLBACK_SCORE
+  }
+}
+
+export async function generateFollowUpQuestions(params: {
+  code: string
+  language: string
+  challengeTitle: string
+  rationaleSummary: string
+}): Promise<{ questions: FollowUpQuestionItem[] }> {
+  const client = getOpenAI()
+  const truncated = params.code.slice(0, 12000)
+  if (!client) {
+    return { questions: FALLBACK_FOLLOWUP }
+  }
+  try {
+    const response = await client.chat.completions.create({
+      model: SCORING_MODEL,
+      response_format: { type: 'json_object' },
+      temperature: 0.35,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You write exactly two verification questions for a coding submission. Each question must reference concrete structures, algorithms, or complexity tradeoffs suggested by the submitted code—not generic prompts like "explain your approach". Someone who genuinely wrote the code can answer without re-reading documentation. Return only valid JSON.',
+        },
+        {
+          role: 'user',
+          content: `Challenge title: ${params.challengeTitle}
+Language: ${params.language}
+Rationale summary: ${params.rationaleSummary || '(none)'}
+
+Submitted code:
+\`\`\`
+${truncated}
+\`\`\`
+
+Return JSON: { "questions": [ { "id": "q1", "prompt": "..." }, { "id": "q2", "prompt": "..." } ] }
+Use ids "q1" and "q2". Each prompt under 600 characters.`,
+        },
+      ],
+    })
+    const text = response.choices[0]?.message?.content
+    if (!text) return { questions: FALLBACK_FOLLOWUP }
+    const parsed = JSON.parse(text) as unknown
+    const out = FollowUpOutputSchema.parse(parsed)
+    return { questions: out.questions }
+  } catch {
+    return { questions: FALLBACK_FOLLOWUP }
   }
 }

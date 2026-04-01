@@ -27,7 +27,7 @@ export const createAdminChallengeRoutes = (opts: AdminRoutesOpts): FastifyPlugin
 
     f.get<{ Params: { id: string } }>(
       '/admin/challenges/:id',
-      { preHandler: adminMw },
+      { preHandler: staffMw },
       async (req, reply) => {
         const ch = await adminApi.getChallengeByIdAdmin(req.params.id)
         if (!ch) return sendError(reply, 404, 'Not found')

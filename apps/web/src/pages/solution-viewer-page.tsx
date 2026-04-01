@@ -1,16 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { SolutionVoteBar } from '@/components/solution-vote-bar'
+import { HdModal } from '@/components/ui/hd-modal'
 import { useAuthUser } from '@/contexts/auth-context'
+import { useToast } from '@/contexts/toast-context'
 import { useChallenge } from '@/hooks/challenges/useChallenge'
 import { useCastVote } from '@/hooks/votes/useCastVote'
 import { useRetractVote } from '@/hooks/votes/useRetractVote'
-import { useVoteCounts } from '@/hooks/votes/useVoteCounts'
 import { useSubmission } from '@/hooks/submissions/useSubmission'
+import { useWithdrawForRevision } from '@/hooks/submissions/useWithdrawForRevision'
+import { useVoteCounts } from '@/hooks/votes/useVoteCounts'
+import { parseAxiosError } from '@/utils/axios-message'
 import { getVotingState } from '@/utils/voting-ui'
 
 export default function SolutionViewerPage() {
-  const { isAuthenticated } = useAuthUser()
+  const navigate = useNavigate()
+  const toast = useToast()
+  const { isAuthenticated, user } = useAuthUser()
+  const { withdraw: withdrawForRevision, loading: withdrawBusy } = useWithdrawForRevision()
   const { slug = '', id = '' } = useParams()
   const { data: chApi } = useChallenge(slug)
   const { data: sub, loading } = useSubmission(id)
@@ -53,6 +60,7 @@ export default function SolutionViewerPage() {
   }, [voteCastAt, canRetract, nowTick])
 
   const [copied, setCopied] = useState(false)
+  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false)
 
   if (!id) {
     return (
@@ -94,9 +102,20 @@ export default function SolutionViewerPage() {
             sub.user?.avatarUrl ??
             `https://api.dicebear.com/7.x/avataaars/svg?seed=${sub.user?.username ?? id}`,
         },
-        rank: sub.finalRank ?? sub.preliminaryRank ?? 0,
-        total: 0,
-        submittedAt: sub.submittedAt ?? '',
+        rankLabel: (() => {
+          const r = sub.finalRank ?? sub.preliminaryRank
+          return r != null ? `#${r}` : '—'
+        })(),
+        submittedLabel: (() => {
+          const raw = sub.submittedAt
+          if (!raw) return null
+          const d = new Date(raw)
+          if (Number.isNaN(d.getTime())) return null
+          return d.toLocaleString(undefined, {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+          })
+        })(),
         rationale: {
           approach: sub.rationaleApproach ?? '',
           tradeoffs: sub.rationaleTradeoffs ?? '',
@@ -121,8 +140,26 @@ export default function SolutionViewerPage() {
     window.setTimeout(() => setCopied(false), 2000)
   }
 
+  const isOwnerPublished = sub != null && user?.id === sub.userId && sub.status === 'PUBLISHED'
+  const revisionWindowOpen =
+    chApi?.status === 'ACTIVE' && chApi.closesAt != null && new Date(chApi.closesAt) > new Date()
+
   return (
     <div className="mx-auto max-w-3xl space-y-10 pb-16">
+      {isOwnerPublished && revisionWindowOpen ? (
+        <div className="rounded-[12px] border border-hd-amber/35 bg-hd-amber/10 px-4 py-3 text-sm text-hd-secondary">
+          <span className="text-hd-text">Want to improve?</span> You can withdraw this publish and
+          edit again on the submit page while the challenge is open.{' '}
+          <button
+            type="button"
+            disabled={withdrawBusy}
+            onClick={() => setWithdrawModalOpen(true)}
+            className="font-medium text-hd-indigo-tint hover:text-hd-indigo-hover disabled:opacity-40"
+          >
+            Revise & resubmit
+          </button>
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center gap-4 border-b border-hd-border pb-6">
         <img
           src={sol.solver.avatar}
@@ -134,8 +171,8 @@ export default function SolutionViewerPage() {
         <div className="min-w-0 flex-1">
           <p className="font-medium text-hd-text">{sol.solver.displayName}</p>
           <p className="font-mono text-xs text-hd-muted">
-            Rank #{sol.rank}
-            {sol.total ? ` of ${sol.total}` : ''} · {sol.submittedAt}
+            Rank {sol.rankLabel}
+            {sol.submittedLabel ? ` · ${sol.submittedLabel}` : ''}
           </p>
         </div>
       </div>
@@ -166,7 +203,9 @@ export default function SolutionViewerPage() {
         ).map(([label, body]) => (
           <section key={label} className="border-l-2 border-hd-indigo pl-4">
             <p className="font-mono text-[10px] uppercase tracking-wide text-hd-muted">{label}</p>
-            <p className="mt-2 text-sm leading-relaxed text-hd-secondary">{body}</p>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-hd-secondary">
+              {body.trim() ? body : '—'}
+            </p>
           </section>
         ))}
       </div>
@@ -220,7 +259,7 @@ export default function SolutionViewerPage() {
 
       <div className="space-y-6">
         <h2 className="text-sm font-medium text-hd-text">Comments</h2>
-        <p className="text-sm text-hd-muted">Comments are not available yet.</p>
+        <p className="text-sm text-hd-muted">Comments coming soon.</p>
       </div>
 
       <div className="flex flex-wrap justify-between gap-4 border-t border-hd-border pt-8">
@@ -237,6 +276,52 @@ export default function SolutionViewerPage() {
           All solutions
         </Link>
       </div>
+
+      <HdModal
+        open={withdrawModalOpen}
+        onClose={() => setWithdrawModalOpen(false)}
+        title="Withdraw and edit again?"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setWithdrawModalOpen(false)}
+              className="rounded-full border border-hd-border px-4 py-2 text-sm font-medium text-hd-text hover:bg-hd-hover"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={withdrawBusy}
+              onClick={() => {
+                void (async () => {
+                  try {
+                    await withdrawForRevision(id)
+                    setWithdrawModalOpen(false)
+                    toast.push('Back to draft — opening submit page.', 'success')
+                    navigate(`/challenge/${slug}/submit`)
+                  } catch (e) {
+                    const msg = parseAxiosError(e).message
+                    if (msg.includes('revision_window_closed')) {
+                      toast.push('The challenge is no longer open for revisions.', 'error')
+                    } else {
+                      toast.push(msg || 'Could not withdraw', 'error')
+                    }
+                  }
+                })()
+              }}
+              className="rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Withdraw to draft
+            </button>
+          </>
+        }
+      >
+        <p>
+          Your entry will leave the public list until you publish again. Rep tied to this submission
+          for this challenge will be reversed. You keep your code to edit from.
+        </p>
+      </HdModal>
     </div>
   )
 }

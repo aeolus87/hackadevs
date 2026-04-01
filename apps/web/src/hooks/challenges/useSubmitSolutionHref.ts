@@ -1,26 +1,31 @@
 import { useMemo } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useActiveChallenges } from '@/hooks/challenges/useActiveChallenges'
 
 export function useSubmitSolutionHref() {
+  const { pathname } = useLocation()
   const { data, loading } = useActiveChallenges()
-  const first = data?.[0]
-  const slug = first?.slug
-  const title = first?.title ?? null
 
   return useMemo(() => {
-    if (slug) {
+    const m = pathname.match(/^\/challenge\/([^/]+)/)
+    const routeSlug = m?.[1] ?? null
+    const titleFromActive =
+      routeSlug && data ? (data.find((c) => c.slug === routeSlug)?.title ?? null) : null
+
+    if (routeSlug) {
       return {
-        href: `/challenge/${slug}/submit` as const,
+        href: `/challenge/${routeSlug}/submit` as const,
         loading,
         hasActive: true as const,
-        challengeTitle: title,
+        challengeTitle: titleFromActive,
       }
     }
+
     return {
-      href: '/challenges' as const,
+      href: '/feed' as const,
       loading,
       hasActive: false as const,
       challengeTitle: null as string | null,
     }
-  }, [slug, title, loading])
+  }, [pathname, data, loading])
 }

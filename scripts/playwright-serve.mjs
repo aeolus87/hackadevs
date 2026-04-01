@@ -36,6 +36,10 @@ const server = spawn('pnpm', ['--filter', '@hackadevs/server', 'exec', 'tsx', 's
     PORT: '4010',
     FRONTEND_URL: webOrigin,
     NODE_ENV: 'development',
+    ...(process.env.DATABASE_URL ? { DATABASE_URL: process.env.DATABASE_URL } : {}),
+    ...(process.env.JWT_SECRET ? { JWT_SECRET: process.env.JWT_SECRET } : {}),
+    ...(process.env.JUDGE0_API_URL ? { JUDGE0_API_URL: process.env.JUDGE0_API_URL } : {}),
+    ...(process.env.JUDGE0_API_KEY ? { JUDGE0_API_KEY: process.env.JUDGE0_API_KEY } : {}),
   },
   stdio: 'inherit',
 })

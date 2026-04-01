@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { HdSelect } from '@/components/ui/hd-select'
+import { useAuthUser } from '@/contexts/auth-context'
 import type { Category, ChallengeStatus } from '@/types/hackadevs-api.types'
 import { useAdminChallenges, type AdminChallengeRow } from '@/hooks/admin/useAdminChallenges'
 import { usePublishChallenge } from '@/hooks/admin/usePublishChallenge'
@@ -67,6 +68,8 @@ function formatOpens(iso: string): string {
 }
 
 export default function AdminChallengesPage() {
+  const { user } = useAuthUser()
+  const canWrite = user?.role === 'ADMIN'
   const [tab, setTab] = useState<ChallengeStatus>('DRAFT')
   const [page, setPage] = useState(1)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -110,18 +113,26 @@ export default function AdminChallengesPage() {
         <div>
           <h1 className="text-[22px] font-medium text-hd-text">Challenge review</h1>
           <p className="mt-1 text-sm text-hd-muted">{rangeLabel}</p>
+          {user?.role === 'MODERATOR' && (
+            <p className="mt-3 max-w-xl rounded-lg border border-hd-amber/30 bg-hd-amber/10 px-3 py-2 text-sm text-hd-amber">
+              You can review the queue as a moderator. Generating challenges, publishing, editing,
+              and deletes require an administrator.
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <span className="rounded-full border border-hd-emerald/30 bg-hd-emerald/10 px-3 py-1 font-mono text-xs text-hd-emerald">
             Active challenges · {activeMeta?.total ?? 0}
           </span>
-          <button
-            type="button"
-            onClick={() => setGenOpen(true)}
-            className="rounded-full border border-hd-indigo px-4 py-2 text-sm font-medium text-hd-indigo-tint hover:bg-hd-indigo-surface"
-          >
-            Generate new
-          </button>
+          {canWrite && (
+            <button
+              type="button"
+              onClick={() => setGenOpen(true)}
+              className="rounded-full border border-hd-indigo px-4 py-2 text-sm font-medium text-hd-indigo-tint hover:bg-hd-indigo-surface"
+            >
+              Generate new
+            </button>
+          )}
         </div>
       </div>
 
@@ -231,7 +242,7 @@ export default function AdminChallengesPage() {
                           <path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
                         </svg>
                       </button>
-                      {(row.status === 'DRAFT' || row.status === 'SCHEDULED') && (
+                      {canWrite && (row.status === 'DRAFT' || row.status === 'SCHEDULED') && (
                         <button
                           type="button"
                           title="Publish"
@@ -243,7 +254,7 @@ export default function AdminChallengesPage() {
                           </svg>
                         </button>
                       )}
-                      {(row.status === 'DRAFT' || row.status === 'SCHEDULED') && (
+                      {canWrite && (row.status === 'DRAFT' || row.status === 'SCHEDULED') && (
                         <button
                           type="button"
                           title="Delete"
@@ -298,9 +309,10 @@ export default function AdminChallengesPage() {
           setSelectedId(null)
         }}
         onSaved={() => void refetch()}
+        canWrite={canWrite}
       />
 
-      {genOpen && (
+      {genOpen && canWrite && (
         <>
           <button
             type="button"

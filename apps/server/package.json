@@ -30,6 +30,7 @@
     "@fastify/rate-limit": "^9.1.0",
     "@fastify/type-provider-typebox": "^4.1.0",
     "@hackadevs/config": "workspace:*",
+    "@hackadevs/core": "workspace:*",
     "@prisma/client": "^5.22.0",
     "@sinclair/typebox": "^0.33.22",
     "bcryptjs": "^3.0.3",

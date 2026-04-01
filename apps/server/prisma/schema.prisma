@@ -78,6 +78,7 @@ enum SubmissionLanguage {
 enum SubmissionStatus {
   DRAFT
   SUBMITTED
+  AWAITING_FOLLOWUP
   EVALUATED
   PUBLISHED
   FLAGGED
@@ -282,6 +283,8 @@ model Submission {
   executionTimeMs      Int?
   memoryUsedMb         Float?
   submittedAt          DateTime?
+  followUpQuestions    Json?
+  followUpAnswers      Json?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
   deletedAt            DateTime?
@@ -397,6 +400,7 @@ model CompanyPortal {
   domainEmail  String              @unique
   portalSecret String              @unique
   linkedinUrl  String?
+  isApproved   Boolean             @default(false)
   isVerified   Boolean             @default(false)
   verifiedAt   DateTime?
   contactName  String

@@ -19,6 +19,8 @@ import AuthCallbackPage from '@/pages/auth-callback-page'
 import NotificationsPage from '@/pages/notifications-page'
 import NotFoundPage from '@/pages/not-found-page'
 import AdminChallengesPage from '@/pages/admin/admin-challenges-page'
+import AdminPortalsPage from '@/pages/admin/admin-portals-page'
+import { ProtectedRoute } from '@/components/routes/protected-route'
 import { StaffRoute } from '@/components/routes/staff-route'
 import { PortalSessionGate } from '@/components/routes/portal-session-gate'
 import PortalRegisterPage from '@/pages/portal/portal-register-page'
@@ -89,7 +91,9 @@ export default function App() {
               path="/challenge/:slug/submit"
               element={
                 <Shell>
-                  <SubmitSolutionPage />
+                  <ProtectedRoute>
+                    <SubmitSolutionPage />
+                  </ProtectedRoute>
                 </Shell>
               }
             />
@@ -97,7 +101,9 @@ export default function App() {
               path="/challenge/:slug/solutions"
               element={
                 <Shell>
-                  <SolutionsBrowserPage />
+                  <ProtectedRoute>
+                    <SolutionsBrowserPage />
+                  </ProtectedRoute>
                 </Shell>
               }
             />
@@ -105,7 +111,9 @@ export default function App() {
               path="/challenge/:slug/solutions/:id"
               element={
                 <Shell>
-                  <SolutionViewerPage />
+                  <ProtectedRoute>
+                    <SolutionViewerPage />
+                  </ProtectedRoute>
                 </Shell>
               }
             />
@@ -129,7 +137,9 @@ export default function App() {
               path="/settings"
               element={
                 <Shell>
-                  <SettingsPage />
+                  <ProtectedRoute>
+                    <SettingsPage />
+                  </ProtectedRoute>
                 </Shell>
               }
             />
@@ -137,7 +147,9 @@ export default function App() {
               path="/notifications"
               element={
                 <Shell>
-                  <NotificationsPage />
+                  <ProtectedRoute>
+                    <NotificationsPage />
+                  </ProtectedRoute>
                 </Shell>
               }
             />
@@ -145,9 +157,23 @@ export default function App() {
               path="/admin/challenges"
               element={
                 <Shell>
-                  <StaffRoute>
-                    <AdminChallengesPage />
-                  </StaffRoute>
+                  <ProtectedRoute>
+                    <StaffRoute>
+                      <AdminChallengesPage />
+                    </StaffRoute>
+                  </ProtectedRoute>
+                </Shell>
+              }
+            />
+            <Route
+              path="/admin/portals"
+              element={
+                <Shell>
+                  <ProtectedRoute>
+                    <StaffRoute>
+                      <AdminPortalsPage />
+                    </StaffRoute>
+                  </ProtectedRoute>
                 </Shell>
               }
             />

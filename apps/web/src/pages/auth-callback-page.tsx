@@ -13,7 +13,16 @@ export default function AuthCallbackPage() {
     const q = new URLSearchParams(window.location.search)
     const token = q.get('token')
     const refresh = q.get('refresh')
-    const next = safeReturnTo(q.get('returnTo'))
+    let next = safeReturnTo(q.get('returnTo'))
+    if (!next) {
+      try {
+        const stored = localStorage.getItem('hackadevs.returnTo')
+        localStorage.removeItem('hackadevs.returnTo')
+        next = safeReturnTo(stored)
+      } catch {
+        next = null
+      }
+    }
     if (!token) {
       navigate(next ? `/login?returnTo=${encodeURIComponent(next)}` : '/login', { replace: true })
       return
@@ -26,7 +35,7 @@ export default function AuthCallbackPage() {
     })
     writeAuthState({ token, user: u, refreshToken: refresh })
     setMessage('Loading profile…')
-    window.location.replace(next ?? '/feed')
+    window.location.replace(next != null ? next : '/feed')
   }, [navigate])
 
   return (

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { RationaleInput, type RationaleParts } from '@/components/rationale-input'
 import { SolutionEditor, type TestCaseResult } from '@/components/solution-editor'
@@ -12,9 +12,10 @@ import { useChallenge } from '@/hooks/challenges/useChallenge'
 import { useMe } from '@/hooks/users/useMe'
 import { useMySubmission } from '@/hooks/submissions/useMySubmission'
 import { useRunTests } from '@/hooks/submissions/useRunTests'
-import { useSaveDraft } from '@/hooks/submissions/useSaveDraft'
+import { useSaveDraft, type SaveDraftPayload } from '@/hooks/submissions/useSaveDraft'
 import { useCompleteFollowUp } from '@/hooks/submissions/useCompleteFollowUp'
 import { useSubmitSolution } from '@/hooks/submissions/useSubmitSolution'
+import { useVerifySubmission } from '@/hooks/submissions/useVerifySubmission'
 import { useWithdrawForRevision } from '@/hooks/submissions/useWithdrawForRevision'
 import { unwrapSuccessData } from '@/lib/api-unwrap'
 import { apiChallengeToUi } from '@/utils/map-api-challenge'
@@ -22,6 +23,8 @@ import { SUBMISSIONS } from '@/utils/api.routes'
 import { axiosInstance } from '@/utils/axios.instance'
 import { parseAxiosError } from '@/utils/axios-message'
 import type { Submission } from '@/types/hackadevs-api.types'
+import { normalizeSubmissionLanguage, type SubmitFlowLanguage } from '@/utils/editor-language'
+import { SubmitChallengeSpecPanel } from '@/components/challenge/submit-challenge-spec-panel'
 
 const suggestTags = [
   'clean-architecture',
@@ -31,8 +34,19 @@ const suggestTags = [
   'rollout-safe',
 ]
 
+const REP_CREDIT_HINT =
+  'Rep is credited when this challenge closes; vote bonuses apply after voting ends.'
+
 function rationaleLength(p: RationaleParts): number {
   return `${p.approach}\n${p.tradeoffs}\n${p.scale}`.trim().length
+}
+
+function publishedSummaryToast(sub: Submission): string {
+  const bits: string[] = []
+  if (sub.testScore != null) bits.push(`Tests ${Math.round(sub.testScore)}%`)
+  if (sub.rationaleScore != null) bits.push(`Rationale ${sub.rationaleScore}/100`)
+  const head = bits.length ? `Published · ${bits.join(' · ')}` : 'Published'
+  return `${head} — ${REP_CREDIT_HINT}`
 }
 
 export default function SubmitSolutionPage() {
@@ -44,11 +58,12 @@ export default function SubmitSolutionPage() {
   const challengeId = apiCh?.id ?? ''
   const { data: mine, loading: mineLoading, refetch: refetchMine } = useMySubmission(challengeId)
   const { refetch: refetchMe } = useMe()
-  const { mutate: saveDraft } = useSaveDraft()
+  const { mutate: saveDraft, loading: saveDraftLoading } = useSaveDraft()
   const { mutate: runTestsApi } = useRunTests()
   const { mutate: submitApi } = useSubmitSolution()
   const { mutate: completeFollowUp, loading: followUpBusy } = useCompleteFollowUp()
   const { withdraw: withdrawForRevision, loading: withdrawBusy } = useWithdrawForRevision()
+  const { mutate: verifyAnswers, loading: verifyBusy } = useVerifySubmission()
   const toast = useToast()
   const [submissionId, setSubmissionId] = useState<string | null>(null)
   const [code, setCode] = useState(`// ${challenge?.title ?? 'Challenge'}\n\n`)
@@ -67,17 +82,30 @@ export default function SubmitSolutionPage() {
   >(null)
   const [followUpAnswers, setFollowUpAnswers] = useState<Record<string, string>>({})
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false)
-  const [submitResult, setSubmitResult] = useState<Submission | null>(null)
+  const [lastDraftSavedAt, setLastDraftSavedAt] = useState<number | null>(null)
   const [resumeFlagBusy, setResumeFlagBusy] = useState(false)
   const [withdrawConfirmOpen, setWithdrawConfirmOpen] = useState(false)
+  const [postVerifyQuestions, setPostVerifyQuestions] = useState<string[] | null>(null)
+  const [verifyA0, setVerifyA0] = useState('')
+  const [verifyA1, setVerifyA1] = useState('')
+  const [verifyRetryHint, setVerifyRetryHint] = useState<string | null>(null)
+  const [solutionLanguage, setSolutionLanguage] = useState<SubmitFlowLanguage>('TS')
+  const [runFlowBusy, setRunFlowBusy] = useState(false)
+  const [submitBusy, setSubmitBusy] = useState(false)
 
   const verificationActive = (pendingVerification?.length ?? 0) > 0
+  const postVerifyOpen = postVerifyQuestions != null && postVerifyQuestions.length === 2
+
+  const markDraftSaved = useCallback(() => {
+    setLastDraftSavedAt(Date.now())
+  }, [])
 
   useEffect(() => {
     if (!mine) return
-    if (mine.status === 'DRAFT') {
+    if (mine.status === 'DRAFT' || mine.status === 'WITHDRAWN') {
       setSubmissionId(mine.id)
       setCode((prev) => mine.code ?? prev)
+      setSolutionLanguage(normalizeSubmissionLanguage(mine.language))
       setRationaleParts({
         approach: mine.rationaleApproach ?? '',
         tradeoffs: mine.rationaleTradeoffs ?? '',
@@ -86,33 +114,74 @@ export default function SubmitSolutionPage() {
       setTags(mine.selfTags ?? [])
       setDifficultyDots(mine.selfDifficultyRating ?? 3)
       setPendingVerification(null)
+      setPostVerifyQuestions(null)
     }
     if (mine.status === 'AWAITING_FOLLOWUP') {
       setSubmissionId(mine.id)
       setCode((prev) => mine.code ?? prev)
+      setSolutionLanguage(normalizeSubmissionLanguage(mine.language))
       const q = mine.followUpQuestions
       if (Array.isArray(q) && q.length > 0) {
         setPendingVerification(q as { id: string; prompt: string }[])
       }
+      setPostVerifyQuestions(null)
+    }
+    if (mine.status === 'SUBMITTED') {
+      setSubmissionId(mine.id)
+      setCode((prev) => mine.code ?? prev)
+      setSolutionLanguage(normalizeSubmissionLanguage(mine.language))
+      const raw = mine.verificationQuestions
+      if (Array.isArray(raw) && raw.length >= 2) {
+        const p0 = (raw[0] as { prompt?: string }).prompt
+        const p1 = (raw[1] as { prompt?: string }).prompt
+        if (p0 && p1) setPostVerifyQuestions([p0, p1])
+      }
     }
   }, [mine])
 
+  const buildDraftPayload = useCallback((): SaveDraftPayload => {
+    return {
+      challengeId,
+      code,
+      language: solutionLanguage,
+      rationaleApproach: rationaleParts.approach,
+      rationaleTradeoffs: rationaleParts.tradeoffs,
+      rationaleScale: rationaleParts.scale,
+      selfTags: tags,
+      selfDifficultyRating: difficultyDots,
+    }
+  }, [
+    challengeId,
+    code,
+    solutionLanguage,
+    rationaleParts.approach,
+    rationaleParts.tradeoffs,
+    rationaleParts.scale,
+    tags,
+    difficultyDots,
+  ])
+
+  const flushDraft = useCallback(async () => {
+    const sub = await saveDraft(buildDraftPayload())
+    setSubmissionId(sub.id)
+    markDraftSaved()
+    return sub
+  }, [saveDraft, buildDraftPayload, markDraftSaved])
+
   useEffect(() => {
-    if (!isAuthenticated || !challengeId || mine?.status === 'AWAITING_FOLLOWUP') return
+    if (
+      !isAuthenticated ||
+      !challengeId ||
+      mine?.status === 'AWAITING_FOLLOWUP' ||
+      mine?.status === 'SUBMITTED'
+    )
+      return
     const t = window.setTimeout(() => {
       void (async () => {
         try {
-          const sub = await saveDraft({
-            challengeId,
-            code,
-            language: 'TS',
-            rationaleApproach: rationaleParts.approach,
-            rationaleTradeoffs: rationaleParts.tradeoffs,
-            rationaleScale: rationaleParts.scale,
-            selfTags: tags,
-            selfDifficultyRating: difficultyDots,
-          })
+          const sub = await saveDraft(buildDraftPayload())
           setSubmissionId(sub.id)
+          markDraftSaved()
         } catch (e) {
           toast.push(parseAxiosError(e).message || 'Draft could not be saved', 'error')
         }
@@ -120,16 +189,13 @@ export default function SubmitSolutionPage() {
     }, 3000)
     return () => window.clearTimeout(t)
   }, [
+    buildDraftPayload,
     challengeId,
-    code,
-    rationaleParts.approach,
-    rationaleParts.tradeoffs,
-    rationaleParts.scale,
-    tags,
-    difficultyDots,
-    saveDraft,
     isAuthenticated,
+    markDraftSaved,
     mine?.status,
+    saveDraft,
+    toast,
   ])
 
   if (!isAuthenticated) {
@@ -262,10 +328,11 @@ export default function SubmitSolutionPage() {
                     try {
                       await withdrawForRevision(mine.id)
                       setWithdrawConfirmOpen(false)
-                      toast.push('Back to draft — you can edit and submit again.', 'success')
+                      toast.push('Solution withdrawn. You can now revise and resubmit.', 'success')
                       void refetchMine()
                       void refetchMe()
                       void refetchCh()
+                      navigate(`/challenge/${challenge.slug}/submit`, { replace: true })
                     } catch (e) {
                       const msg = parseAxiosError(e).message
                       if (msg.includes('revision_window_closed')) {
@@ -316,8 +383,7 @@ export default function SubmitSolutionPage() {
       <div className="mx-auto max-w-lg space-y-4 rounded-[16px] border border-hd-border bg-hd-card p-8">
         <h1 className="text-xl font-medium text-hd-text">Verification next</h1>
         <p className="text-sm text-hd-secondary">
-          Your tests and rationale are already scored. Finish by answering two short questions about
-          your own code — same flow as everyone else, no manual queue.
+          Answer two short prompts to publish — same flow for everyone.
         </p>
         <div className="flex flex-wrap gap-3">
           <button
@@ -354,7 +420,7 @@ export default function SubmitSolutionPage() {
 
   const rationaleOk = rationaleLength(rationaleParts) >= 100
   const testsOk = testScorePercent != null && testScorePercent >= 50
-  const canSubmit = !verificationActive && testsOk && rationaleOk
+  const canSubmit = !verificationActive && !postVerifyOpen && testsOk && rationaleOk
   const codeEmpty = !code.trim()
   const submitTip = 'Run tests first and write your rationale.'
 
@@ -363,11 +429,34 @@ export default function SubmitSolutionPage() {
   }
 
   const executeSubmit = async () => {
-    if (!canSubmit) return
-    setSubmitConfirmOpen(false)
-    if (submissionId) {
+    if (!canSubmit || submitBusy) return
+    setSubmitBusy(true)
+    try {
+      let row: Submission
       try {
-        const r = await submitApi(submissionId, challenge.slug)
+        row = await flushDraft()
+      } catch (e) {
+        toast.push(parseAxiosError(e).message || 'Could not save draft', 'error')
+        return
+      }
+      setSubmitConfirmOpen(false)
+      try {
+        const r = await submitApi(row.id, challenge.slug)
+        if (
+          r &&
+          typeof r === 'object' &&
+          'status' in r &&
+          (r as { status: string }).status === 'AWAITING_VERIFICATION'
+        ) {
+          const vr = r as { submissionId: string; questions: string[] }
+          setSubmissionId(vr.submissionId)
+          setPostVerifyQuestions(vr.questions)
+          setVerifyA0('')
+          setVerifyA1('')
+          setVerifyRetryHint(null)
+          void refetchMine()
+          return
+        }
         if (
           r &&
           typeof r === 'object' &&
@@ -383,18 +472,19 @@ export default function SubmitSolutionPage() {
         if (r && typeof r === 'object' && 'id' in r && 'status' in r) {
           const sub = r as Submission
           if (sub.status === 'PUBLISHED') {
-            setSubmitResult(sub)
             void refetchMe()
             void refetchMine()
             void refetchCh()
+            toast.push(publishedSummaryToast(sub), 'success')
+            navigate(`/challenge/${challenge.slug}/solutions/${sub.id}`)
           }
         }
       } catch {
         return
       }
-      return
+    } finally {
+      setSubmitBusy(false)
     }
-    toast.push('Save a draft first (wait for auto-save)', 'error')
   }
 
   const finalizeVerification = async () => {
@@ -409,26 +499,66 @@ export default function SubmitSolutionPage() {
     }
     try {
       const sub = await completeFollowUp(submissionId, answers)
-      setSubmitResult(sub)
       void refetchMe()
       void refetchMine()
       void refetchCh()
+      toast.push(publishedSummaryToast(sub), 'success')
+      navigate(`/challenge/${challenge.slug}/solutions/${sub.id}`)
+    } catch (e) {
+      toast.push(parseAxiosError(e).message || 'Could not publish', 'error')
+    }
+  }
+
+  const submitPostVerify = async () => {
+    if (!submissionId || !postVerifyQuestions) return
+    const a0 = verifyA0.trim()
+    const a1 = verifyA1.trim()
+    if (a0.length < 50 || a1.length < 50 || a0.length > 500 || a1.length > 500) {
+      toast.push('Each answer must be 50–500 characters.', 'error')
+      return
+    }
+    try {
+      const r = await verifyAnswers(submissionId, [a0, a1])
+      setVerifyRetryHint(null)
+      if (!r.verified && r.unavailable) {
+        toast.push(
+          r.message ?? 'Verification is temporarily unavailable. Please try again in a moment.',
+          'error',
+        )
+        return
+      }
+      if (r.verified) {
+        void refetchMe()
+        void refetchMine()
+        void refetchCh()
+        toast.push('Solution published!', 'success')
+        navigate(`/challenge/${challenge.slug}/solutions/${submissionId}`)
+        return
+      }
+      if (r.canRetry) {
+        setVerifyRetryHint('Your answers were not specific enough. Try again.')
+        setVerifyA0('')
+        setVerifyA1('')
+        void refetchMine()
+        return
+      }
+      toast.push(
+        r.message ?? 'Submission not verified. Your draft is saved — you can revise and resubmit.',
+        'error',
+      )
+      setPostVerifyQuestions(null)
+      void refetchMine()
     } catch {
       return
     }
   }
 
   const runTests = async () => {
-    if (codeEmpty) return
-    if (!submissionId) {
-      toast.push(
-        'Save your draft first. Your work saves automatically every few seconds; run tests once a draft exists.',
-        'error',
-      )
-      return
-    }
+    if (codeEmpty || runFlowBusy) return
+    setRunFlowBusy(true)
     try {
-      const r = await runTestsApi(submissionId)
+      const row = await flushDraft()
+      const r = await runTestsApi(row.id)
       const total = r.results.length
       const passed = r.results.filter((x) => x.passed).length
       setTestScorePercent(total ? (passed / total) * 100 : 0)
@@ -437,6 +567,7 @@ export default function SubmitSolutionPage() {
           id: `t${i}`,
           name: `Test ${i + 1}`,
           passed: x.passed,
+          detail: x.stderr ?? undefined,
         })),
       )
       setExecutionTimeMs(r.executionTimeMs)
@@ -458,11 +589,75 @@ export default function SubmitSolutionPage() {
       } else {
         toast.push(message || 'Run failed', 'error')
       }
+    } finally {
+      setRunFlowBusy(false)
     }
   }
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="relative mx-auto max-w-6xl">
+      {postVerifyOpen && postVerifyQuestions ? (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-hd-page/95 px-4 py-8 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="verify-title"
+        >
+          <div className="max-h-[min(90dvh,720px)] w-full max-w-lg overflow-y-auto rounded-[16px] border border-hd-border bg-hd-elevated p-6 shadow-xl">
+            <h1 id="verify-title" className="text-lg font-medium text-hd-text">
+              One last step — prove it&apos;s yours
+            </h1>
+            <p className="mt-2 text-sm text-hd-secondary">
+              Answer 2 quick questions about your code. If you wrote it, you know it.
+            </p>
+            {verifyRetryHint ? (
+              <p className="mt-3 rounded-lg border border-hd-amber/35 bg-hd-amber/10 px-3 py-2 text-sm text-hd-amber">
+                {verifyRetryHint}
+              </p>
+            ) : null}
+            <div className="mt-6 space-y-4">
+              <div>
+                <label className="text-[13px] text-hd-secondary" htmlFor="v-a0">
+                  {postVerifyQuestions[0]}
+                </label>
+                <textarea
+                  id="v-a0"
+                  rows={4}
+                  value={verifyA0}
+                  onChange={(e) => setVerifyA0(e.target.value)}
+                  className="mt-1.5 w-full rounded-[10px] border border-hd-border bg-hd-surface px-3 py-2 text-sm text-hd-text"
+                />
+              </div>
+              <div>
+                <label className="text-[13px] text-hd-secondary" htmlFor="v-a1">
+                  {postVerifyQuestions[1]}
+                </label>
+                <textarea
+                  id="v-a1"
+                  rows={4}
+                  value={verifyA1}
+                  onChange={(e) => setVerifyA1(e.target.value)}
+                  className="mt-1.5 w-full rounded-[10px] border border-hd-border bg-hd-surface px-3 py-2 text-sm text-hd-text"
+                />
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={
+                verifyBusy ||
+                verifyA0.trim().length < 50 ||
+                verifyA1.trim().length < 50 ||
+                verifyA0.trim().length > 500 ||
+                verifyA1.trim().length > 500
+              }
+              onClick={() => void submitPostVerify()}
+              className="mt-6 h-11 w-full rounded-full bg-hd-indigo text-sm font-medium text-white hover:bg-hd-indigo-hover disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {verifyBusy ? 'Submitting…' : 'Submit answers'}
+            </button>
+          </div>
+        </div>
+      ) : null}
       <div className="mb-6">
         <Link
           to={`/challenge/${challenge.slug}`}
@@ -474,21 +669,33 @@ export default function SubmitSolutionPage() {
           {challenge.title}
         </Link>
       </div>
+      {apiCh ? <SubmitChallengeSpecPanel challenge={apiCh} /> : null}
       <div className="grid min-h-[calc(100dvh-10rem)] gap-6 lg:grid-cols-2 lg:gap-8">
         <div className="flex min-h-[50vh] flex-col lg:min-h-[min(640px,calc(100dvh-10rem))]">
-          {challengeId && !submissionId && (
-            <p className="mb-2 text-xs text-hd-secondary">
-              Your draft saves automatically. Run tests after a draft exists (usually a few
-              seconds).
+          {!verificationActive && challengeId ? (
+            <p className="mb-2 text-xs text-hd-secondary" data-testid="submit-draft-status">
+              {saveDraftLoading ? (
+                'Saving draft…'
+              ) : lastDraftSavedAt != null ? (
+                <>
+                  Last saved{' '}
+                  {new Date(lastDraftSavedAt).toLocaleTimeString(undefined, {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}
+                  . Run tests when ready.
+                </>
+              ) : submissionId ? (
+                'Draft on your account. Run tests when ready.'
+              ) : (
+                'Your draft saves automatically a few seconds after you edit. Run tests once it exists.'
+              )}
             </p>
-          )}
+          ) : null}
           {verificationActive && pendingVerification && pendingVerification.length > 0 ? (
             <div className="mb-4 rounded-[12px] border border-hd-indigo/35 bg-hd-indigo-surface px-4 py-4">
               <p className="text-sm font-medium text-hd-text">Verification</p>
-              <p className="mt-1 text-[13px] text-hd-secondary">
-                Short answers about your own code — required before your solution is published and
-                earns recognition.
-              </p>
+              <p className="mt-1 text-[13px] text-hd-secondary">Two short answers, then publish.</p>
               <div className="mt-4 space-y-4">
                 {pendingVerification.map((q) => (
                   <div key={q.id}>
@@ -524,7 +731,10 @@ export default function SubmitSolutionPage() {
             <SolutionEditor
               value={code}
               onChange={setCode}
-              runDisabled={codeEmpty || !submissionId || verificationActive}
+              language={solutionLanguage}
+              onLanguageChange={setSolutionLanguage}
+              runDisabled={codeEmpty || verificationActive}
+              runPending={runFlowBusy}
               testResults={testResults}
               executionTimeMs={executionTimeMs}
               onRunTests={() => void runTests()}
@@ -581,7 +791,7 @@ export default function SubmitSolutionPage() {
           </div>
           <button
             type="button"
-            disabled={!canSubmit || verificationActive}
+            disabled={!canSubmit || verificationActive || submitBusy}
             title={
               verificationActive
                 ? 'Complete verification questions first'
@@ -592,7 +802,7 @@ export default function SubmitSolutionPage() {
             onClick={() => setSubmitConfirmOpen(true)}
             className="h-11 w-full shrink-0 rounded-full bg-hd-indigo text-sm font-medium text-white transition-colors duration-150 ease-out hover:bg-hd-indigo-hover disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Submit solution
+            {submitBusy ? 'Submitting…' : 'Submit solution'}
           </button>
         </div>
       </div>
@@ -612,90 +822,20 @@ export default function SubmitSolutionPage() {
             </button>
             <button
               type="button"
+              disabled={submitBusy}
               onClick={() => void executeSubmit()}
-              className="rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover"
+              className="rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Submit
+              {submitBusy ? 'Submitting…' : 'Submit'}
             </button>
           </>
         }
       >
         <p>
-          You will not be able to edit your code or rationale after this. You may need to answer a
-          couple of short verification questions before your score is finalized.
+          You can't edit code or rationale after submit. You may get one or two verification
+          questions first.
         </p>
-      </HdModal>
-
-      <HdModal
-        open={submitResult !== null}
-        onClose={() => {
-          if (!submitResult) return
-          setSubmitResult(null)
-          navigate(`/challenge/${challenge.slug}/solutions/${submitResult.id}`)
-        }}
-        title="You are in"
-        footer={
-          <>
-            <button
-              type="button"
-              onClick={() => {
-                if (!submitResult) return
-                setSubmitResult(null)
-                navigate(`/challenge/${challenge.slug}`)
-              }}
-              className="rounded-full border border-hd-border px-4 py-2 text-sm font-medium text-hd-text hover:bg-hd-hover"
-            >
-              Challenge page
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (!submitResult) return
-                const id = submitResult.id
-                setSubmitResult(null)
-                navigate(`/challenge/${challenge.slug}/solutions/${id}`)
-              }}
-              className="rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover"
-            >
-              View solution
-            </button>
-          </>
-        }
-      >
-        {submitResult ? (
-          <div className="space-y-3 text-hd-text">
-            <p className="text-[13px] text-hd-secondary">
-              Scores below are from this submission. Profile rep updates as challenges close and
-              votes roll in.
-            </p>
-            <ul className="space-y-2 font-mono text-[13px]">
-              <li className="flex justify-between gap-4">
-                <span className="text-hd-muted">Tests</span>
-                <span>
-                  {submitResult.testScore != null ? `${Math.round(submitResult.testScore)}%` : '—'}
-                </span>
-              </li>
-              <li className="flex justify-between gap-4">
-                <span className="text-hd-muted">Rationale</span>
-                <span>
-                  {submitResult.rationaleScore != null ? `${submitResult.rationaleScore}/100` : '—'}
-                </span>
-              </li>
-              <li className="flex justify-between gap-4">
-                <span className="text-hd-muted">Composite</span>
-                <span>
-                  {submitResult.compositeScore != null
-                    ? submitResult.compositeScore.toFixed(1)
-                    : '—'}
-                </span>
-              </li>
-              <li className="flex justify-between gap-4">
-                <span className="text-hd-muted">Rep from this solve</span>
-                <span>{submitResult.repAwarded != null ? `+${submitResult.repAwarded}` : '—'}</span>
-              </li>
-            </ul>
-          </div>
-        ) : null}
+        <p className="mt-3 text-hd-muted">{REP_CREDIT_HINT}</p>
       </HdModal>
     </div>
   )

@@ -139,13 +139,34 @@ export async function publishChallenge(prisma: PrismaClient, id: string) {
 export async function closeChallenge(prisma: PrismaClient, id: string) {
   const ch = await prisma.challenge.findFirst({
     where: { id, deletedAt: null },
-    include: { submissions: { where: { status: 'PUBLISHED', deletedAt: null } } },
+    include: {
+      submissions: {
+        where: {
+          status: 'PUBLISHED',
+          deletedAt: null,
+          OR: [
+            { verificationStatus: null },
+            { verificationStatus: 'PASSED' },
+            { verificationStatus: 'SKIPPED' },
+          ],
+        },
+      },
+    },
   })
   if (!ch) return null
-  await prisma.challenge.update({
-    where: { id },
+  if (ch.status === 'CLOSED') {
+    return prisma.challenge.findFirst({ where: { id } })
+  }
+  if (ch.status !== 'ACTIVE') {
+    return null
+  }
+  const transition = await prisma.challenge.updateMany({
+    where: { id, status: 'ACTIVE', deletedAt: null },
     data: { status: 'CLOSED' },
   })
+  if (transition.count === 0) {
+    return prisma.challenge.findFirst({ where: { id } })
+  }
   const closingParticipants = await prisma.submission.findMany({
     where: {
       challengeId: id,
@@ -210,7 +231,16 @@ export async function closeChallenge(prisma: PrismaClient, id: string) {
   }
   await awardPreliminaryRep(prisma, rankedSubs, ch, streakByUserId)
   const count = await prisma.submission.count({
-    where: { challengeId: id, status: 'PUBLISHED', deletedAt: null },
+    where: {
+      challengeId: id,
+      status: 'PUBLISHED',
+      deletedAt: null,
+      OR: [
+        { verificationStatus: null },
+        { verificationStatus: 'PASSED' },
+        { verificationStatus: 'SKIPPED' },
+      ],
+    },
   })
   await prisma.challenge.update({
     where: { id },
@@ -234,10 +264,15 @@ export async function getChallengeLeaderboard(
   })
   if (!ch) return null
   const skip = (page - 1) * limit
-  const where = {
+  const where: Prisma.SubmissionWhereInput = {
     challengeId: ch.id,
-    status: 'PUBLISHED' as const,
+    status: 'PUBLISHED',
     deletedAt: null,
+    OR: [
+      { verificationStatus: null },
+      { verificationStatus: 'PASSED' },
+      { verificationStatus: 'SKIPPED' },
+    ],
   }
   const [items, total] = await Promise.all([
     prisma.submission.findMany({

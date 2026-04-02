@@ -3,6 +3,8 @@ export type EmailKind =
   | 'challenge_closing_soon'
   | 'company_bookmark_notification'
   | 'streak_at_risk'
+  | 'portal_approved'
+  | 'portal_rejected'
 
 export function createResendClient(apiKey: string) {
   const base = 'https://api.resend.com'

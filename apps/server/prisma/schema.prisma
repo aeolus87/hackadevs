@@ -164,8 +164,9 @@ model User {
   globalRank            Int?
   currentStreakDays     Int               @default(0)
   longestStreakDays     Int               @default(0)
-  lastSubmissionDate    DateTime?
-  streakGracesRemaining Int               @default(1)
+  lastSubmissionDate       DateTime?
+  streakAtRiskEmailSentAt  DateTime?
+  streakGracesRemaining    Int               @default(1)
   tier                  UserTier          @default(NOVICE)
   selfDeclaredLevel     SelfDeclaredLevel @default(JUNIOR)
   isVerified            Boolean           @default(false)
@@ -285,6 +286,9 @@ model Submission {
   submittedAt          DateTime?
   followUpQuestions    Json?
   followUpAnswers      Json?
+  verificationQuestions Json?
+  verificationStatus   String?
+  verificationRetryCount Int             @default(0)
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
   deletedAt            DateTime?
@@ -405,6 +409,7 @@ model CompanyPortal {
   verifiedAt   DateTime?
   contactName  String
   contactEmail String
+  rejectedAt   DateTime?
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
   deletedAt    DateTime?

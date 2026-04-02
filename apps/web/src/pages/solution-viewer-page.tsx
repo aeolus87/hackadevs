@@ -174,6 +174,12 @@ export default function SolutionViewerPage() {
             Rank {sol.rankLabel}
             {sol.submittedLabel ? ` · ${sol.submittedLabel}` : ''}
           </p>
+          {sub != null && sub.finalRank == null && sub.preliminaryRank == null ? (
+            <p className="mt-1 text-[11px] leading-snug text-hd-muted">
+              Rank and rep from this challenge are assigned after it closes and voting settles — not
+              at publish time.
+            </p>
+          ) : null}
         </div>
       </div>
 

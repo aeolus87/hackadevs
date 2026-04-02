@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { safeReturnTo } from '@/utils/login-path'
 
 export const authInputClassName =
   'w-full rounded-md border border-hd-border bg-hd-surface px-2.5 py-2 text-[13px] leading-snug text-hd-text placeholder:text-hd-muted transition-[border-color,box-shadow] duration-150 focus:border-hd-indigo/45 focus:outline-none focus:ring-1 focus:ring-hd-indigo/25'
@@ -85,12 +86,21 @@ function GitHubMark({ className }: { className?: string }) {
 
 type AuthGitHubButtonProps = {
   href: string
+  returnToPersist?: string | null
 }
 
-export function AuthGitHubButton({ href }: AuthGitHubButtonProps) {
+export function AuthGitHubButton({ href, returnToPersist }: AuthGitHubButtonProps) {
   return (
     <a
       href={href}
+      onClick={() => {
+        try {
+          const dest = safeReturnTo(returnToPersist ?? null) ?? '/feed'
+          localStorage.setItem('hackadevs.returnTo', dest)
+        } catch {
+          return
+        }
+      }}
       className="flex w-full items-center justify-center gap-2 rounded-lg border border-hd-border bg-hd-elevated py-2.5 text-[13px] font-medium text-hd-text shadow-[inset_0_1px_0_rgb(255_255_255/0.04)] transition-[border-color,background-color] duration-150 hover:border-hd-border-hover hover:bg-hd-hover"
     >
       <GitHubMark className="h-4 w-4 shrink-0 text-hd-text" />

@@ -25,12 +25,15 @@ const serverEnvSchema = z.object({
   CLOUDFLARE_R2_SECRET_ACCESS_KEY: z.string().optional(),
   CLOUDFLARE_R2_BUCKET: z.string().optional(),
   CLOUDFLARE_R2_PUBLIC_URL: z.string().url().optional(),
+  ASSETS_BASE_URL: z.string().url().optional(),
+  S3_ENDPOINT: z.string().url().optional(),
   WEEKLY_CHALLENGE_CRON: z.string().default('0 0 * * 1'),
   CHALLENGE_PUBLISH_CRON: z.string().default('0 9 * * 1'),
   STREAK_CHECK_CRON: z.string().default('1 0 * * *'),
   REP_DECAY_CRON: z.string().default('0 2 * * 1'),
   RANK_RECOMPUTE_CRON: z.string().default('0 3 * * *'),
   WEEKLY_DIGEST_CRON: z.string().default('0 20 * * 0'),
+  STREAK_AT_RISK_CRON: z.string().default('0 20 * * *'),
 })
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>

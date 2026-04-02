@@ -22,7 +22,11 @@ import {
   updateChallenge,
 } from '../challenges/challenges.service.js'
 import { createSubmissionsService } from '../submissions/submissions.service.js'
-import { completeFollowUpSchema, saveDraftSchema } from '../submissions/submissions.schema.js'
+import {
+  completeFollowUpSchema,
+  saveDraftSchema,
+  verifyAnswersSchema,
+} from '../submissions/submissions.schema.js'
 import { createVotesService } from '../votes/votes.service.js'
 import { castVoteSchema } from '../votes/votes.schema.js'
 import { createLeaderboardService } from '../leaderboard/leaderboard.service.js'
@@ -34,7 +38,7 @@ import {
 } from '../notifications/notifications.service.js'
 import { createUsersService } from '../users/users.service.js'
 import { toUserPublic } from '../auth/user-public.js'
-import { patchMeSchema } from '../users/users.schema.js'
+import { avatarUploadSchema, patchMeSchema } from '../users/users.schema.js'
 import { generateChallengeSchema, moderationPatchSchema } from '../admin/admin.schema.js'
 import { createAdminService } from '../admin/admin.service.js'
 import { createAdminChallengeRoutes } from '../admin/admin.routes.js'
@@ -74,7 +78,7 @@ export const createV1Routes = (opts: V1RouteOpts): FastifyPluginAsync => {
   const votesApi = createVotesService(prisma)
   const leaderboardApi = createLeaderboardService(prisma)
   const followsApi = createFollowsService(prisma)
-  const usersApi = createUsersService(prisma)
+  const usersApi = createUsersService(prisma, env)
   const adminApi = createAdminService(prisma)
   const portalApi = createCompanyPortalService(prisma)
 
@@ -86,7 +90,7 @@ export const createV1Routes = (opts: V1RouteOpts): FastifyPluginAsync => {
 
     await f.register(githubOauthPlugin, { prisma, jwtSecret, env })
 
-    await f.register(createAdminChallengeRoutes({ jwtSecret }))
+    await f.register(createAdminChallengeRoutes({ jwtSecret, env }))
 
     await f.register(createAuthRoutes(prisma, jwtSecret), { prefix: '/auth' })
 
@@ -190,6 +194,21 @@ export const createV1Routes = (opts: V1RouteOpts): FastifyPluginAsync => {
       if (!parsed.success) return sendError(reply, 400, 'Invalid body')
       const u = await usersApi.patchMe(req.jwtUser!.sub, parsed.data)
       return sendSuccess(reply, toUserPublic(u))
+    })
+
+    f.post('/users/me/avatar', { preHandler: authMw }, async (req, reply) => {
+      const parsed = avatarUploadSchema.safeParse(req.body)
+      if (!parsed.success) return sendError(reply, 400, 'Invalid body')
+      try {
+        const r = await usersApi.requestAvatarUpload(
+          req.jwtUser!.sub,
+          parsed.data.filename,
+          parsed.data.contentType,
+        )
+        return sendSuccess(reply, r)
+      } catch (e) {
+        return handleErr(reply, e)
+      }
     })
 
     f.get('/users/me', { preHandler: authMw }, async (req, reply) => {
@@ -352,6 +371,33 @@ export const createV1Routes = (opts: V1RouteOpts): FastifyPluginAsync => {
         } catch (e) {
           return handleErr(reply, e)
         }
+      },
+    )
+
+    f.post<{ Params: { id: string } }>(
+      '/submissions/:id/verify',
+      { preHandler: authMw },
+      async (req, reply) => {
+        const parsed = verifyAnswersSchema.safeParse(req.body)
+        if (!parsed.success) return sendError(reply, 400, 'Invalid body')
+        try {
+          const r = await submissionsApi.verifySubmissionAnswers(
+            req.params.id,
+            req.jwtUser!.sub,
+            parsed.data,
+          )
+          return sendSuccess(reply, r)
+        } catch (e) {
+          return handleErr(reply, e)
+        }
+      },
+    )
+
+    f.get<{ Params: { challengeId: string } }>(
+      '/submissions/challenge/:challengeId/stats',
+      async (req, reply) => {
+        const r = await submissionsApi.getChallengeSubmissionStats(req.params.challengeId)
+        return sendSuccess(reply, r)
       },
     )
 
@@ -622,19 +668,6 @@ export const createV1Routes = (opts: V1RouteOpts): FastifyPluginAsync => {
       const data = await adminApi.analytics()
       return sendSuccess(reply, data)
     })
-
-    f.post<{ Params: { id: string } }>(
-      '/admin/portals/:id/approve',
-      { preHandler: adminMw },
-      async (req, reply) => {
-        try {
-          const row = await adminApi.approveCompanyPortal(req.params.id)
-          return sendSuccess(reply, row)
-        } catch (e) {
-          return handleErr(reply, e)
-        }
-      },
-    )
 
     f.post('/portal/register', async (req, reply) => {
       const parsed = registerPortalSchema.safeParse(req.body)

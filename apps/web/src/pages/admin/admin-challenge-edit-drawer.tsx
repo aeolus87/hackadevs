@@ -2,9 +2,13 @@ import { useEffect, useState } from 'react'
 import type { AdminPatchChallengeBody } from '@hackadevs/core'
 import { HdSelect } from '@/components/ui/hd-select'
 import type { Category, ChallengeStatus } from '@/types/hackadevs-api.types'
+import { useToast } from '@/contexts/toast-context'
 import { useAdminChallenge } from '@/hooks/admin/useAdminChallenge'
+import { useArchiveChallenge } from '@/hooks/admin/useArchiveChallenge'
+import { useCloseChallenge } from '@/hooks/admin/useCloseChallenge'
 import { useUpdateChallenge } from '@/hooks/admin/useUpdateChallenge'
 import { usePublishChallenge } from '@/hooks/admin/usePublishChallenge'
+import { parseAxiosError } from '@/utils/axios-message'
 
 const CATEGORIES: Category[] = [
   'BACKEND',
@@ -61,9 +65,20 @@ export function AdminChallengeEditDrawer({
     onSaved()
     void refetch()
   })
+  const toast = useToast()
   const { mutate: publish, loading: publishing } = usePublishChallenge(() => {
     onSaved()
     onClose()
+  })
+  const { mutate: closeChallenge, loading: closing } = useCloseChallenge(() => {
+    toast.push('Challenge closed — preliminary rep awarded, voting window open.', 'success')
+    onSaved()
+    void refetch()
+  })
+  const { mutate: archiveChallenge, loading: archiving } = useArchiveChallenge(() => {
+    toast.push('Challenge archived.', 'success')
+    onSaved()
+    void refetch()
   })
 
   const [title, setTitle] = useState('')
@@ -164,7 +179,10 @@ export function AdminChallengeEditDrawer({
           )}
           {loading && !detail && <p className="text-sm text-hd-muted">Loading…</p>}
           {detail && (
-            <fieldset disabled={!canWrite} className="min-h-0 space-y-4 border-0 p-0">
+            <fieldset
+              disabled={!canWrite || detail.status === 'ARCHIVED'}
+              className="min-h-0 space-y-4 border-0 p-0"
+            >
               <label className="block">
                 <span className="text-xs text-hd-muted">Title</span>
                 <input
@@ -359,32 +377,65 @@ export function AdminChallengeEditDrawer({
             </fieldset>
           )}
         </div>
-        <div className="flex flex-wrap gap-2 border-t border-hd-border p-4">
-          <button
-            type="button"
-            disabled={!canWrite || saving || !detail}
-            onClick={() => void patch(challengeId, buildBody()).then(() => refetch())}
-            className="rounded-full border border-hd-border px-4 py-2 text-sm text-hd-secondary hover:bg-hd-hover disabled:opacity-40"
-          >
-            Save draft
-          </button>
-          <button
-            type="button"
-            disabled={!canWrite || saving || !detail || scheduleDisabled}
-            onClick={() => void patch(challengeId, buildBody('SCHEDULED'))}
-            className="rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover disabled:opacity-40"
-          >
-            Save & schedule
-          </button>
-          <button
-            type="button"
-            disabled={!canWrite || publishing || !detail}
-            onClick={() => void publish(challengeId)}
-            className="rounded-full bg-hd-emerald px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40"
-          >
-            Publish now
-          </button>
-        </div>
+        {detail?.status === 'ARCHIVED' ? null : (
+          <div className="flex flex-wrap gap-2 border-t border-hd-border p-4">
+            <button
+              type="button"
+              disabled={!canWrite || saving || !detail}
+              onClick={() => void patch(challengeId, buildBody()).then(() => refetch())}
+              className="rounded-full border border-hd-border px-4 py-2 text-sm text-hd-secondary hover:bg-hd-hover disabled:opacity-40"
+            >
+              Save draft
+            </button>
+            <button
+              type="button"
+              disabled={!canWrite || saving || !detail || scheduleDisabled}
+              onClick={() => void patch(challengeId, buildBody('SCHEDULED'))}
+              className="rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover disabled:opacity-40"
+            >
+              Save & schedule
+            </button>
+            <button
+              type="button"
+              disabled={!canWrite || publishing || !detail}
+              onClick={() => void publish(challengeId)}
+              className="rounded-full bg-hd-emerald px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40"
+            >
+              Publish now
+            </button>
+            {detail?.status === 'ACTIVE' ? (
+              <button
+                type="button"
+                disabled={!canWrite || closing || publishing || saving}
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      'Close this challenge now? New submissions stop, preliminary rep is credited, and the voting phase starts (same as automatic close at deadline).',
+                    )
+                  ) {
+                    return
+                  }
+                  void closeChallenge(challengeId).catch((e) => {
+                    toast.push(parseAxiosError(e).message || 'Could not close challenge', 'error')
+                  })
+                }}
+                className="rounded-full border border-hd-amber/50 bg-hd-amber/15 px-4 py-2 text-sm font-medium text-hd-amber hover:bg-hd-amber/25 disabled:opacity-40"
+              >
+                {closing ? 'Closing…' : 'Close challenge now'}
+              </button>
+            ) : null}
+            {detail?.status === 'CLOSED' ? (
+              <button
+                type="button"
+                disabled={!canWrite || archiving || saving}
+                onClick={() => void archiveChallenge(challengeId)}
+                className="rounded-full border border-hd-border px-4 py-2 text-sm font-medium text-hd-text hover:bg-hd-hover disabled:opacity-40"
+              >
+                {archiving ? 'Archiving…' : 'Archive'}
+              </button>
+            ) : null}
+          </div>
+        )}
       </div>
     </>
   )

@@ -1,7 +1,9 @@
 import type { PrismaClient } from '@prisma/client'
+import type { ServerEnv } from '@hackadevs/config'
+import { getPresignedPutObjectUrl } from '../../integrations/s3.client.js'
 import type { PatchMeBody } from './users.schema.js'
 
-export function createUsersService(prisma: PrismaClient) {
+export function createUsersService(prisma: PrismaClient, env: ServerEnv) {
   return {
     async getMe(userId: string) {
       return prisma.user.findFirst({
@@ -16,6 +18,28 @@ export function createUsersService(prisma: PrismaClient) {
         data: body,
         include: { categoryReps: { where: { deletedAt: null } } },
       })
+    },
+
+    async requestAvatarUpload(userId: string, _filename: string, contentType: string) {
+      const assetsBase =
+        env.ASSETS_BASE_URL?.replace(/\/$/, '') ?? env.CLOUDFLARE_R2_PUBLIC_URL?.replace(/\/$/, '')
+      if (!assetsBase) {
+        throw Object.assign(new Error('avatar_upload_unconfigured'), { statusCode: 503 })
+      }
+      const extByType: Record<string, string> = {
+        'image/jpeg': 'jpg',
+        'image/png': 'png',
+        'image/webp': 'webp',
+        'image/gif': 'gif',
+      }
+      const safeExt = extByType[contentType] ?? 'bin'
+      const key = `avatars/${userId}/${Date.now()}.${safeExt}`
+      const uploadUrl = await getPresignedPutObjectUrl(env, key, contentType, 120)
+      if (!uploadUrl) {
+        throw Object.assign(new Error('avatar_storage_unconfigured'), { statusCode: 503 })
+      }
+      const publicUrl = `${assetsBase}/${key}`
+      return { uploadUrl, publicUrl, key }
     },
 
     async getPublicProfile(username: string, viewerId: string | null) {

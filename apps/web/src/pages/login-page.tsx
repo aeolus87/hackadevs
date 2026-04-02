@@ -50,7 +50,7 @@ export default function LoginPage() {
         </>
       }
     >
-      <AuthGitHubButton href={githubOAuthUrl} />
+      <AuthGitHubButton href={githubOAuthUrl} returnToPersist={returnTo ?? '/feed'} />
       <AuthDivider label="or email" />
       <form onSubmit={submit} className="space-y-3">
         <div>

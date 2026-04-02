@@ -18,7 +18,12 @@ export default function PortalRegisterPage() {
   const [contactName, setContactName] = useState('')
   const [contactEmail, setContactEmail] = useState('')
   const [linkedinUrl, setLinkedinUrl] = useState('')
-  const [revealed, setRevealed] = useState<{ portalId: string; portalSecret: string } | null>(null)
+  const [revealed, setRevealed] = useState<{
+    portalId: string
+    portalSecret: string
+    companyName: string
+    isApproved: boolean
+  } | null>(null)
 
   if (existing?.portalId && existing?.portalSecret && !revealed) {
     return <Navigate to="/portal/dashboard" replace />
@@ -34,7 +39,12 @@ export default function PortalRegisterPage() {
         contactEmail,
         linkedinUrl: linkedinUrl.trim() || undefined,
       })
-      setRevealed({ portalId: r.portalId, portalSecret: r.portalSecret })
+      setRevealed({
+        portalId: r.portalId,
+        portalSecret: r.portalSecret,
+        companyName: r.portal.companyName,
+        isApproved: r.portal.isApproved,
+      })
     } catch {
       return
     }
@@ -48,9 +58,14 @@ export default function PortalRegisterPage() {
     }
   }
 
-  const continueToDashboard = () => {
+  const continueToDashboard = (meta?: { companyName: string; isApproved: boolean }) => {
     if (!revealed) return
-    writePortalSession({ portalId: revealed.portalId, portalSecret: revealed.portalSecret })
+    writePortalSession({
+      portalId: revealed.portalId,
+      portalSecret: revealed.portalSecret,
+      companyName: meta?.companyName,
+      isApproved: meta?.isApproved,
+    })
     window.location.assign('/portal/dashboard')
   }
 
@@ -63,7 +78,7 @@ export default function PortalRegisterPage() {
           <>
             <button
               type="button"
-              onClick={continueToDashboard}
+              onClick={() => continueToDashboard(revealed ?? undefined)}
               className={authPrimaryButtonClassName}
             >
               I have saved my credentials — continue

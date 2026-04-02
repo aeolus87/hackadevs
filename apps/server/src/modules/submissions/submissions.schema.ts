@@ -23,3 +23,9 @@ export const completeFollowUpSchema = z.object({
 })
 
 export type CompleteFollowUpBody = z.infer<typeof completeFollowUpSchema>
+
+export const verifyAnswersSchema = z.object({
+  answers: z.array(z.string().min(50).max(500)).length(2),
+})
+
+export type VerifyAnswersBody = z.infer<typeof verifyAnswersSchema>

@@ -10,6 +10,7 @@ import type { Submission } from '@/types/hackadevs-api.types'
 export type SubmitSolutionResponse =
   | { status: 'EVALUATED'; testScore: number; message: string }
   | { status: 'AWAITING_FOLLOWUP'; followUpQuestions: { id: string; prompt: string }[] }
+  | { status: 'AWAITING_VERIFICATION'; submissionId: string; questions: string[] }
   | Submission
 
 export function useSubmitSolution() {
@@ -28,6 +29,9 @@ export function useSubmitSolution() {
           const st = (data as { status: string }).status
           if (st === 'AWAITING_FOLLOWUP') {
             return data as Extract<SubmitSolutionResponse, { status: 'AWAITING_FOLLOWUP' }>
+          }
+          if (st === 'AWAITING_VERIFICATION') {
+            return data as Extract<SubmitSolutionResponse, { status: 'AWAITING_VERIFICATION' }>
           }
           if (st === 'EVALUATED') {
             const ev = data as Extract<SubmitSolutionResponse, { status: 'EVALUATED' }>

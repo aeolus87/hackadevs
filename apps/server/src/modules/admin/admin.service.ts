@@ -1,4 +1,4 @@
-import type { ChallengeStatus, PrismaClient } from '@prisma/client'
+import type { ChallengeStatus, Prisma, PrismaClient } from '@prisma/client'
 import { generateChallenge } from '../../integrations/openai.client.js'
 import { slugify } from '../../utils/slugify.js'
 import { awardRep, revokeRep } from '../rep/rep.service.js'
@@ -55,7 +55,7 @@ export function createAdminService(prisma: PrismaClient) {
       if (body.action === 'APPROVED') {
         await prisma.submission.update({
           where: { id: submissionId },
-          data: { status: 'PUBLISHED' },
+          data: { status: 'PUBLISHED', verificationStatus: 'SKIPPED' },
         })
         return { ok: true as const }
       }
@@ -70,7 +70,7 @@ export function createAdminService(prisma: PrismaClient) {
       if (body.action === 'WARNED') {
         await prisma.submission.update({
           where: { id: submissionId },
-          data: { status: 'PUBLISHED' },
+          data: { status: 'PUBLISHED', verificationStatus: 'SKIPPED' },
         })
         return { ok: true as const }
       }
@@ -222,7 +222,12 @@ export function createAdminService(prisma: PrismaClient) {
       if (body.companyAttributionOptIn != null) {
         data.companyAttributionOptIn = body.companyAttributionOptIn
       }
-      if (body.status != null) data.status = body.status
+      if (body.status != null) {
+        if (body.status === 'ARCHIVED' && ch.status !== 'CLOSED') {
+          throw Object.assign(new Error('only_closed_can_archive'), { statusCode: 400 })
+        }
+        data.status = body.status
+      }
       return prisma.challenge.update({
         where: { id },
         data: data as object,
@@ -241,6 +246,58 @@ export function createAdminService(prisma: PrismaClient) {
       })
     },
 
+    async listCompanyPortals(status: 'pending' | 'approved' | 'all', page: number, limit: number) {
+      const skip = (page - 1) * limit
+      const where: Prisma.CompanyPortalWhereInput = { deletedAt: null }
+      if (status === 'pending') {
+        where.isApproved = false
+        where.rejectedAt = null
+      } else if (status === 'approved') {
+        where.isApproved = true
+      }
+      const [items, total] = await Promise.all([
+        prisma.companyPortal.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            _count: {
+              select: {
+                challenges: { where: { deletedAt: null } },
+                bookmarks: { where: { deletedAt: null } },
+              },
+            },
+          },
+        }),
+        prisma.companyPortal.count({ where }),
+      ])
+      return { items, total, page, limit }
+    },
+
+    async getCompanyPortalByIdAdmin(id: string) {
+      const p = await prisma.companyPortal.findFirst({
+        where: { id, deletedAt: null },
+        include: {
+          _count: {
+            select: {
+              challenges: { where: { deletedAt: null } },
+              bookmarks: { where: { deletedAt: null } },
+            },
+          },
+          challenges: {
+            where: { deletedAt: null },
+            orderBy: { createdAt: 'desc' },
+            include: {
+              challenge: { select: { title: true, slug: true } },
+            },
+          },
+        },
+      })
+      if (!p) throw Object.assign(new Error('not_found'), { statusCode: 404 })
+      return p
+    },
+
     async approveCompanyPortal(portalId: string) {
       const p = await prisma.companyPortal.findFirst({
         where: { id: portalId, deletedAt: null },
@@ -248,7 +305,43 @@ export function createAdminService(prisma: PrismaClient) {
       if (!p) throw Object.assign(new Error('not_found'), { statusCode: 404 })
       return prisma.companyPortal.update({
         where: { id: portalId },
-        data: { isApproved: true },
+        data: {
+          isApproved: true,
+          isVerified: true,
+          verifiedAt: new Date(),
+          rejectedAt: null,
+        },
+        include: {
+          _count: {
+            select: {
+              challenges: { where: { deletedAt: null } },
+              bookmarks: { where: { deletedAt: null } },
+            },
+          },
+        },
+      })
+    },
+
+    async rejectCompanyPortal(portalId: string) {
+      const p = await prisma.companyPortal.findFirst({
+        where: { id: portalId, deletedAt: null },
+      })
+      if (!p) throw Object.assign(new Error('not_found'), { statusCode: 404 })
+      return prisma.companyPortal.update({
+        where: { id: portalId },
+        data: {
+          isApproved: false,
+          isVerified: false,
+          rejectedAt: new Date(),
+        },
+        include: {
+          _count: {
+            select: {
+              challenges: { where: { deletedAt: null } },
+              bookmarks: { where: { deletedAt: null } },
+            },
+          },
+        },
       })
     },
   }

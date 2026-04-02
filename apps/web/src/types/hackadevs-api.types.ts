@@ -149,12 +149,25 @@ export interface Submission {
   submittedAt?: string
   followUpQuestions?: { id: string; prompt: string }[]
   followUpAnswers?: { id: string; text: string }[]
+  verificationQuestions?: { id: string; prompt: string }[]
+  verificationStatus?: string | null
+  verificationRetryCount?: number
   user?: SubmissionAuthor
+  updatedAt?: string
+}
+
+export type TestRunCaseResult = {
+  passed: boolean
+  stdout?: string | null
+  stderr?: string | null
+  executionTimeMs?: number
+  memoryUsedMb?: number
 }
 
 export interface TestRunResult {
-  results: { input: string; expected: string; actual: string; passed: boolean }[]
+  results: TestRunCaseResult[]
   executionTimeMs: number
+  testScore?: number
 }
 
 export interface LeaderboardEntry {

@@ -2,48 +2,19 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { config } from 'dotenv'
 import bcrypt from 'bcryptjs'
-import type {
-  AvailabilityStatus,
-  Categories,
-  ChallengeDifficulty,
-  SelfDeclaredLevel,
-} from '@prisma/client'
+import type { Categories, ChallengeDifficulty } from '@prisma/client'
 import { CHALLENGE_TEST_SUITES } from './challenge-test-suites.js'
 import { prisma } from './lib/prisma.js'
 import { assignRanks, calculateCompositeScore } from './utils/rankingEngine.js'
 import { awardPreliminaryRep, awardRep } from './modules/rep/rep.service.js'
 import { createLeaderboardService } from './modules/leaderboard/leaderboard.service.js'
+import { buildSyntheticUsers } from './seed/build-users.js'
+import { seedFollows, seedVotesAndRefreshRanks } from './seed/social.js'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 config({ path: path.join(repoRoot, '.env') })
 
-const SEED_USERNAMES = [
-  'hackadevs_admin',
-  'alex_chen',
-  'mira_okonkwo',
-  'jon_patel',
-  'sam_rivera',
-  'taylor_kim',
-  'casey_wu',
-  'priya_shah',
-  'marcus_lee',
-  'sofia_torres',
-  'james_kwon',
-] as const
-
 const ADMIN_USERNAME = 'hackadevs_admin'
-const DEMO_USERNAMES = SEED_USERNAMES.filter((u) => u !== ADMIN_USERNAME)
-
-type DemoProf = {
-  username: string
-  displayName: string
-  email: string
-  selfDeclaredLevel: SelfDeclaredLevel
-  currentStreakDays: number
-  submissionSlugs: string[]
-  testScores: number[]
-  rationaleScores: number[]
-}
 
 const CHALLENGE_SLUGS = [
   'rate-limiter-redis-failover',
@@ -62,18 +33,8 @@ const CHALLENGE_SLUGS = [
   'fetch-health-json',
 ] as const
 
-const DEMO_AVAILABILITY: Record<string, AvailabilityStatus> = {
-  alex_chen: 'OPEN_TO_WORK',
-  mira_okonkwo: 'EMPLOYED',
-  jon_patel: 'FREELANCE_OPEN',
-  sam_rivera: 'OPEN_TO_WORK',
-  taylor_kim: 'NOT_LOOKING',
-  casey_wu: 'EMPLOYED',
-  priya_shah: 'OPEN_TO_WORK',
-  marcus_lee: 'NOT_LOOKING',
-  sofia_torres: 'OPEN_TO_WORK',
-  james_kwon: 'EMPLOYED',
-}
+const SYNTHETIC_USERS = buildSyntheticUsers(CHALLENGE_SLUGS)
+const DEMO_USERNAMES = SYNTHETIC_USERS.map((u) => u.username)
 
 const SEED_SOLUTION_CODE: Record<string, string> = {
   'sum-positive-numbers': `export function solve(input: string): string {
@@ -426,135 +387,41 @@ const SEED_CHALLENGES: {
   },
 ]
 
-const DEMO_PROFILES: DemoProf[] = [
-  {
-    username: 'alex_chen',
-    displayName: 'Alex Chen',
-    email: 'alex@demo.hackadevs.dev',
-    selfDeclaredLevel: 'SENIOR',
-    currentStreakDays: 14,
-    submissionSlugs: ['sum-positive-numbers', 'fizzbuzz-classic', 'merge-two-sorted-arrays'],
-    testScores: [88, 92, 85],
-    rationaleScores: [78, 82, 74],
-  },
-  {
-    username: 'mira_okonkwo',
-    displayName: 'Mira Okonkwo',
-    email: 'mira@demo.hackadevs.dev',
-    selfDeclaredLevel: 'SENIOR',
-    currentStreakDays: 22,
-    submissionSlugs: ['palindrome-check', 'slugify-url-segment', 'fetch-health-json'],
-    testScores: [95, 72, 90],
-    rationaleScores: [88, 70, 85],
-  },
-  {
-    username: 'jon_patel',
-    displayName: 'Jon Patel',
-    email: 'jon@demo.hackadevs.dev',
-    selfDeclaredLevel: 'MID',
-    currentStreakDays: 7,
-    submissionSlugs: [
-      'dockerfile-monorepo-prod',
-      'idempotency-keys-ledger-scale',
-      'rate-limiter-redis-failover',
-    ],
-    testScores: [81, 76, 79],
-    rationaleScores: [72, 68, 75],
-  },
-  {
-    username: 'sam_rivera',
-    displayName: 'Sam Rivera',
-    email: 'sam@demo.hackadevs.dev',
-    selfDeclaredLevel: 'MID',
-    currentStreakDays: 3,
-    submissionSlugs: ['fizzbuzz-classic', 'palindrome-check'],
-    testScores: [91, 87],
-    rationaleScores: [80, 77],
-  },
-  {
-    username: 'taylor_kim',
-    displayName: 'Taylor Kim',
-    email: 'taylor@demo.hackadevs.dev',
-    selfDeclaredLevel: 'JUNIOR',
-    currentStreakDays: 0,
-    submissionSlugs: [
-      'comment-system-10m-dau',
-      'ml-serving-traffic-spikes',
-      'dockerfile-monorepo-prod',
-    ],
-    testScores: [74, 82, 78],
-    rationaleScores: [62, 70, 65],
-  },
-  {
-    username: 'casey_wu',
-    displayName: 'Casey Wu',
-    email: 'casey@demo.hackadevs.dev',
-    selfDeclaredLevel: 'SENIOR',
-    currentStreakDays: 30,
-    submissionSlugs: ['fetch-health-json', 'fizzbuzz-classic'],
-    testScores: [68, 94],
-    rationaleScores: [64, 90],
-  },
-  {
-    username: 'priya_shah',
-    displayName: 'Priya Shah',
-    email: 'priya@demo.hackadevs.dev',
-    selfDeclaredLevel: 'MID',
-    currentStreakDays: 11,
-    submissionSlugs: ['palindrome-check', 'merge-two-sorted-arrays', 'rate-limiter-redis-failover'],
-    testScores: [86, 89, 83],
-    rationaleScores: [76, 81, 79],
-  },
-  {
-    username: 'marcus_lee',
-    displayName: 'Marcus Lee',
-    email: 'marcus@demo.hackadevs.dev',
-    selfDeclaredLevel: 'MID',
-    currentStreakDays: 5,
-    submissionSlugs: ['slugify-url-segment', 'sum-positive-numbers'],
-    testScores: [93, 85],
-    rationaleScores: [84, 72],
-  },
-  {
-    username: 'sofia_torres',
-    displayName: 'Sofia Torres',
-    email: 'sofia@demo.hackadevs.dev',
-    selfDeclaredLevel: 'JUNIOR',
-    currentStreakDays: 1,
-    submissionSlugs: ['fetch-health-json', 'merge-two-sorted-arrays', 'fizzbuzz-classic'],
-    testScores: [77, 71, 69],
-    rationaleScores: [60, 58, 55],
-  },
-  {
-    username: 'james_kwon',
-    displayName: 'James Kwon',
-    email: 'james@demo.hackadevs.dev',
-    selfDeclaredLevel: 'SENIOR',
-    currentStreakDays: 18,
-    submissionSlugs: ['palindrome-check', 'sum-positive-numbers'],
-    testScores: [97, 90],
-    rationaleScores: [92, 86],
-  },
-]
-
 async function wipeSeedScope() {
   const slugList = [...CHALLENGE_SLUGS]
+  const seedUsers = await prisma.user.findMany({
+    where: {
+      deletedAt: null,
+      OR: [
+        { email: { endsWith: '@seed.hackadevs.dev' } },
+        { email: { endsWith: '@demo.hackadevs.dev' } },
+        { username: ADMIN_USERNAME },
+      ],
+    },
+    select: { id: true },
+  })
+  const seedUserIds = seedUsers.map((u) => u.id)
+
   const challenges = await prisma.challenge.findMany({
     where: { slug: { in: slugList }, deletedAt: null },
     select: { id: true },
   })
   const challengeIds = challenges.map((c) => c.id)
+
   if (challengeIds.length === 0) {
-    const seedUsers = await prisma.user.findMany({
-      where: { username: { in: [...SEED_USERNAMES] } },
-      select: { id: true },
-    })
-    const userIds = seedUsers.map((u) => u.id)
-    if (userIds.length) {
-      await prisma.repEvent.deleteMany({ where: { userId: { in: userIds } } })
-      await prisma.categoryRep.deleteMany({ where: { userId: { in: userIds } } })
+    if (seedUserIds.length) {
+      await prisma.follow.deleteMany({
+        where: {
+          OR: [{ followerId: { in: seedUserIds } }, { followeeId: { in: seedUserIds } }],
+        },
+      })
+      await prisma.notification.deleteMany({ where: { userId: { in: seedUserIds } } })
+      await prisma.badge.deleteMany({ where: { userId: { in: seedUserIds } } })
+      await prisma.refreshToken.deleteMany({ where: { userId: { in: seedUserIds } } })
+      await prisma.repEvent.deleteMany({ where: { userId: { in: seedUserIds } } })
+      await prisma.categoryRep.deleteMany({ where: { userId: { in: seedUserIds } } })
       await prisma.user.updateMany({
-        where: { id: { in: userIds } },
+        where: { id: { in: seedUserIds } },
         data: { totalRep: 0, weeklyRepDelta: 0, globalRank: null, tier: 'NOVICE' },
       })
     }
@@ -567,33 +434,43 @@ async function wipeSeedScope() {
   })
   const subIds = subs.map((s) => s.id)
 
-  const seedUsers = await prisma.user.findMany({
-    where: { username: { in: [...SEED_USERNAMES] } },
-    select: { id: true },
-  })
-  const seedUserIds = seedUsers.map((u) => u.id)
-
   if (subIds.length) {
+    await prisma.userPinnedSubmission.deleteMany({ where: { submissionId: { in: subIds } } })
+    await prisma.companyBookmark.deleteMany({ where: { submissionId: { in: subIds } } })
     await prisma.vote.deleteMany({ where: { submissionId: { in: subIds } } })
-    await prisma.repEvent.deleteMany({ where: { submissionId: { in: subIds } } })
+    await prisma.repEvent.deleteMany({
+      where: {
+        OR: [{ submissionId: { in: subIds } }, { challengeId: { in: challengeIds } }],
+      },
+    })
     await prisma.submission.deleteMany({ where: { id: { in: subIds } } })
+  } else {
+    await prisma.repEvent.deleteMany({ where: { challengeId: { in: challengeIds } } })
   }
 
-  await prisma.repEvent.deleteMany({
-    where: {
-      userId: { in: seedUserIds },
-      submissionId: null,
-    },
+  await prisma.companyChallenge.updateMany({
+    where: { challengeId: { in: challengeIds } },
+    data: { challengeId: null },
   })
 
   await prisma.challenge.deleteMany({ where: { id: { in: challengeIds } } })
 
-  await prisma.categoryRep.deleteMany({ where: { userId: { in: seedUserIds } } })
-
-  await prisma.user.updateMany({
-    where: { id: { in: seedUserIds } },
-    data: { totalRep: 0, weeklyRepDelta: 0, globalRank: null, tier: 'NOVICE' },
-  })
+  if (seedUserIds.length) {
+    await prisma.follow.deleteMany({
+      where: {
+        OR: [{ followerId: { in: seedUserIds } }, { followeeId: { in: seedUserIds } }],
+      },
+    })
+    await prisma.notification.deleteMany({ where: { userId: { in: seedUserIds } } })
+    await prisma.badge.deleteMany({ where: { userId: { in: seedUserIds } } })
+    await prisma.refreshToken.deleteMany({ where: { userId: { in: seedUserIds } } })
+    await prisma.repEvent.deleteMany({ where: { userId: { in: seedUserIds } } })
+    await prisma.categoryRep.deleteMany({ where: { userId: { in: seedUserIds } } })
+    await prisma.user.updateMany({
+      where: { id: { in: seedUserIds } },
+      data: { totalRep: 0, weeklyRepDelta: 0, globalRank: null, tier: 'NOVICE' },
+    })
+  }
 }
 
 async function upsertAdmin(adminIdHolder: { id: string }) {
@@ -632,9 +509,9 @@ async function upsertAdmin(adminIdHolder: { id: string }) {
   }
 }
 
-async function upsertDemoUsers() {
+async function upsertSyntheticUsers() {
   const hash = await bcrypt.hash('demo1234', 12)
-  for (const p of DEMO_PROFILES) {
+  for (const p of SYNTHETIC_USERS) {
     const avatarUrl = `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(p.username)}`
     await prisma.user.upsert({
       where: { username: p.username },
@@ -643,20 +520,22 @@ async function upsertDemoUsers() {
         email: p.email,
         passwordHash: hash,
         displayName: p.displayName,
+        tagline: p.tagline,
         avatarUrl,
         selfDeclaredLevel: p.selfDeclaredLevel,
         currentStreakDays: p.currentStreakDays,
         role: 'USER',
-        availabilityStatus: DEMO_AVAILABILITY[p.username] ?? 'UNSPECIFIED',
+        availabilityStatus: p.availabilityStatus,
       },
       update: {
         passwordHash: hash,
         displayName: p.displayName,
+        tagline: p.tagline,
         avatarUrl,
         selfDeclaredLevel: p.selfDeclaredLevel,
         currentStreakDays: p.currentStreakDays,
         role: 'USER',
-        availabilityStatus: DEMO_AVAILABILITY[p.username] ?? 'UNSPECIFIED',
+        availabilityStatus: p.availabilityStatus,
       },
     })
   }
@@ -733,14 +612,14 @@ async function seedSubmissionsAndRep() {
   )
 
   const streakByUserId: Record<string, number> = {}
-  for (const p of DEMO_PROFILES) {
+  for (const p of SYNTHETIC_USERS) {
     const uid = usernameToId.get(p.username)
     if (uid) streakByUserId[uid] = p.currentStreakDays
   }
 
   const submittedAt = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
 
-  for (const p of DEMO_PROFILES) {
+  for (const p of SYNTHETIC_USERS) {
     const userId = usernameToId.get(p.username)
     if (!userId) continue
     for (let i = 0; i < p.submissionSlugs.length; i++) {
@@ -883,6 +762,26 @@ async function seedSubmissionsAndRep() {
   }
 }
 
+async function seedStreakBadges() {
+  const rows = await prisma.user.findMany({
+    where: {
+      deletedAt: null,
+      username: { not: ADMIN_USERNAME },
+      currentStreakDays: { gte: 7 },
+    },
+    select: { id: true, currentStreakDays: true },
+  })
+  const badgeData: { userId: string; type: 'STREAK_7' | 'STREAK_30' | 'STREAK_100' }[] = []
+  for (const u of rows) {
+    if (u.currentStreakDays >= 100) badgeData.push({ userId: u.id, type: 'STREAK_100' })
+    else if (u.currentStreakDays >= 30) badgeData.push({ userId: u.id, type: 'STREAK_30' })
+    else badgeData.push({ userId: u.id, type: 'STREAK_7' })
+  }
+  if (badgeData.length) {
+    await prisma.badge.createMany({ data: badgeData })
+  }
+}
+
 async function main() {
   const reset = process.argv.includes('--reset')
   if (reset) {
@@ -892,14 +791,25 @@ async function main() {
 
   const adminIdHolder = { id: '' }
   await upsertAdmin(adminIdHolder)
-  await upsertDemoUsers()
+  await upsertSyntheticUsers()
   await upsertChallenges(adminIdHolder.id)
   await seedSubmissionsAndRep()
+  await seedFollows(prisma)
+  await seedVotesAndRefreshRanks(prisma, CHALLENGE_SLUGS)
+  await seedStreakBadges()
 
   const lb = createLeaderboardService(prisma)
   await lb.recomputeGlobalRanks()
 
-  console.info('Seed completed.')
+  const [userCount, subCount, voteCount, followCount] = await Promise.all([
+    prisma.user.count({ where: { deletedAt: null } }),
+    prisma.submission.count({ where: { deletedAt: null } }),
+    prisma.vote.count({ where: { deletedAt: null } }),
+    prisma.follow.count({ where: { deletedAt: null } }),
+  ])
+  console.info(
+    `Seed completed. users=${userCount} submissions=${subCount} votes=${voteCount} follows=${followCount}`,
+  )
 }
 
 main()

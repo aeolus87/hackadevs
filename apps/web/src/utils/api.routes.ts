@@ -18,6 +18,7 @@ export const AUTH = {
 
 export const USERS = {
   ME: () => `${V1}/users/me`,
+  AVATAR: () => `${V1}/users/me/avatar`,
   ME_ACTIVITY: () => `${V1}/users/me/activity`,
   PROFILE_ACTIVITY: (username: string) => `${V1}/users/${encodeURIComponent(username)}/activity`,
   PROFILE: (username: string) => `${V1}/users/${encodeURIComponent(username)}`,
@@ -56,6 +57,9 @@ export const SUBMISSIONS = {
     `${V1}/submissions/mine/challenge/${encodeURIComponent(challengeId)}`,
   BY_CHALLENGE: (challengeId: string) =>
     `${V1}/submissions/challenge/${encodeURIComponent(challengeId)}`,
+  STATS: (challengeId: string) =>
+    `${V1}/submissions/challenge/${encodeURIComponent(challengeId)}/stats`,
+  VERIFY: (id: string) => `${V1}/submissions/${encodeURIComponent(id)}/verify`,
   WITHDRAW: (id: string) => `${V1}/submissions/${encodeURIComponent(id)}`,
 }
 
@@ -87,7 +91,23 @@ export const ADMIN = {
   CHALLENGES: () => `${V1}/admin/challenges`,
   CHALLENGE: (id: string) => `${V1}/admin/challenges/${encodeURIComponent(id)}`,
   PUBLISH: (id: string) => `${V1}/admin/challenges/${encodeURIComponent(id)}/publish`,
+  CLOSE: (id: string) => `${V1}/admin/challenges/${encodeURIComponent(id)}/close`,
   GENERATE: () => `${V1}/admin/challenges/generate`,
+  PORTALS: (params?: {
+    status?: 'pending' | 'approved' | 'all'
+    page?: number
+    limit?: number
+  }) => {
+    const sp = new URLSearchParams()
+    if (params?.status) sp.set('status', params.status)
+    if (params?.page != null) sp.set('page', String(params.page))
+    if (params?.limit != null) sp.set('limit', String(params.limit))
+    const q = sp.toString()
+    return q ? `${V1}/admin/portals?${q}` : `${V1}/admin/portals`
+  },
+  PORTAL: (id: string) => `${V1}/admin/portals/${encodeURIComponent(id)}`,
+  PORTAL_APPROVE: (id: string) => `${V1}/admin/portals/${encodeURIComponent(id)}/approve`,
+  PORTAL_REJECT: (id: string) => `${V1}/admin/portals/${encodeURIComponent(id)}/reject`,
 }
 
 export const PORTAL = {

@@ -9,6 +9,7 @@ import { runRankRecomputeJob } from './rankRecompute.job.js'
 import { runChallengeGenerationJob } from './challengeGeneration.job.js'
 import { runStreakCheckerJob } from './streakChecker.job.js'
 import { runWeeklyDigestJob } from './weeklyDigest.job.js'
+import { runStreakAtRiskJob } from './streakAtRisk.job.js'
 
 const QUEUE = 'hackadevs'
 
@@ -52,6 +53,11 @@ export async function startBackgroundJobs(redisUrl: string, env: ServerEnv) {
     {},
     { repeat: { pattern: env.WEEKLY_DIGEST_CRON }, jobId: 'weekly-digest-cron' },
   )
+  await queue.add(
+    'streak-at-risk',
+    {},
+    { repeat: { pattern: env.STREAK_AT_RISK_CRON }, jobId: 'streak-at-risk-cron' },
+  )
 
   const worker = new Worker(
     QUEUE,
@@ -82,6 +88,13 @@ export async function startBackgroundJobs(redisUrl: string, env: ServerEnv) {
           break
         case 'weekly-digest':
           await runWeeklyDigestJob(
+            env.RESEND_API_KEY,
+            env.RESEND_FROM ?? 'noreply@hackadevs.dev',
+            env.FRONTEND_URL,
+          )
+          break
+        case 'streak-at-risk':
+          await runStreakAtRiskJob(
             env.RESEND_API_KEY,
             env.RESEND_FROM ?? 'noreply@hackadevs.dev',
             env.FRONTEND_URL,

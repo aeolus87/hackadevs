@@ -1,11 +1,19 @@
 import { Prisma, type Challenge, type PrismaClient } from '@prisma/client'
 import type { RunWithPollingResult } from '../../integrations/judge0.client.js'
 import { createJudge0Client } from '../../integrations/judge0.client.js'
-import { generateFollowUpQuestions, scoreRationale } from '../../integrations/openai.client.js'
+import {
+  generateFollowUpQuestions,
+  scoreRationale,
+  scoreVerificationAnswers,
+} from '../../integrations/openai.client.js'
 import { recordSubmissionStreak } from '../../utils/streakEngine.js'
 import { revokeRep } from '../rep/rep.service.js'
 import { createNotification } from '../notifications/notifications.service.js'
-import type { CompleteFollowUpBody, SaveDraftBody } from './submissions.schema.js'
+import type {
+  CompleteFollowUpBody,
+  SaveDraftBody,
+  VerifyAnswersBody,
+} from './submissions.schema.js'
 
 export type SubmissionsDeps = {
   judge0Url?: string
@@ -13,6 +21,13 @@ export type SubmissionsDeps = {
 }
 
 type TestSuiteItem = { input: string; expectedOutput: string; isVisible: boolean }
+
+function trimRunDetail(text: string | null | undefined, max = 2000): string | undefined {
+  if (text == null) return undefined
+  const t = text.trim()
+  if (!t) return undefined
+  return t.length <= max ? t : `${t.slice(0, max)}…`
+}
 
 function parseSuite(raw: unknown): TestSuiteItem[] {
   if (!Array.isArray(raw)) return []
@@ -119,28 +134,67 @@ export function createSubmissionsService(prisma: PrismaClient, deps: Submissions
       if (!ch || ch.status !== 'ACTIVE' || ch.closesAt <= now) {
         throw Object.assign(new Error('challenge_not_available'), { statusCode: 400 })
       }
-      return prisma.submission.upsert({
-        where: { userId_challengeId: { userId, challengeId: data.challengeId } },
-        create: {
+      const existing = await prisma.submission.findFirst({
+        where: { userId, challengeId: data.challengeId, deletedAt: null },
+      })
+      const draftPayload = {
+        code: data.code,
+        language: data.language,
+        rationaleApproach: data.rationaleApproach,
+        rationaleTradeoffs: data.rationaleTradeoffs,
+        rationaleScale: data.rationaleScale,
+        selfTags: data.selfTags,
+        selfDifficultyRating: data.selfDifficultyRating,
+      }
+      if (existing) {
+        if (existing.status === 'WITHDRAWN') {
+          return prisma.submission.update({
+            where: { id: existing.id },
+            data: {
+              ...draftPayload,
+              status: 'DRAFT',
+              testScore: null,
+              testsPassedCount: null,
+              testsTotalCount: null,
+              rationaleScore: null,
+              rationaleClarity: null,
+              rationaleDepth: null,
+              rationaleHonesty: null,
+              rationaleScalability: null,
+              rationaleSummary: null,
+              rationaleFlags: [],
+              voteScore: null,
+              upvoteCount: 0,
+              downvoteCount: 0,
+              compositeScore: null,
+              preliminaryRank: null,
+              finalRank: null,
+              repAwarded: null,
+              executionTimeMs: null,
+              memoryUsedMb: null,
+              submittedAt: null,
+              followUpQuestions: Prisma.DbNull,
+              followUpAnswers: Prisma.DbNull,
+              verificationQuestions: Prisma.DbNull,
+              verificationStatus: null,
+              verificationRetryCount: 0,
+            },
+          })
+        }
+        if (existing.status !== 'DRAFT') {
+          throw Object.assign(new Error('already_submitted'), { statusCode: 409 })
+        }
+        return prisma.submission.update({
+          where: { id: existing.id },
+          data: draftPayload,
+        })
+      }
+      return prisma.submission.create({
+        data: {
           userId,
           challengeId: data.challengeId,
-          code: data.code,
-          language: data.language,
-          rationaleApproach: data.rationaleApproach,
-          rationaleTradeoffs: data.rationaleTradeoffs,
-          rationaleScale: data.rationaleScale,
-          selfTags: data.selfTags,
-          selfDifficultyRating: data.selfDifficultyRating,
+          ...draftPayload,
           status: 'DRAFT',
-        },
-        update: {
-          code: data.code,
-          language: data.language,
-          rationaleApproach: data.rationaleApproach,
-          rationaleTradeoffs: data.rationaleTradeoffs,
-          rationaleScale: data.rationaleScale,
-          selfTags: data.selfTags,
-          selfDifficultyRating: data.selfDifficultyRating,
         },
       })
     },
@@ -173,7 +227,17 @@ export function createSubmissionsService(prisma: PrismaClient, deps: Submissions
         where: { id: submissionId },
         data: { testScore, executionTimeMs, memoryUsedMb },
       })
-      return { results, executionTimeMs, testScore }
+      return {
+        results: results.map((r) => ({
+          passed: r.passed,
+          stdout: r.stdout,
+          stderr: trimRunDetail(r.stderr),
+          executionTimeMs: r.executionTimeMs,
+          memoryUsedMb: r.memoryUsedMb,
+        })),
+        executionTimeMs,
+        testScore,
+      }
     },
 
     async submitSolution(submissionId: string, userId: string) {
@@ -191,10 +255,6 @@ export function createSubmissionsService(prisma: PrismaClient, deps: Submissions
       if (sub.status !== 'DRAFT') {
         throw Object.assign(new Error('already_submitted'), { statusCode: 409 })
       }
-      await prisma.submission.update({
-        where: { id: submissionId },
-        data: { status: 'SUBMITTED', submittedAt: now },
-      })
       const suite = parseSuite(ch.testSuite)
       const { results, executionTimeMs, testScore } = await runSuite(
         judge0,
@@ -204,21 +264,22 @@ export function createSubmissionsService(prisma: PrismaClient, deps: Submissions
       )
       const passed = results.filter((r) => r.passed).length
       const mem = results.reduce((m, r) => Math.max(m, r.memoryUsedMb), 0)
-      await prisma.submission.update({
-        where: { id: submissionId },
-        data: {
-          testScore,
-          testsPassedCount: passed,
-          testsTotalCount: suite.length,
-          executionTimeMs,
-          memoryUsedMb: mem,
-        },
-      })
       if (testScore < 50) {
-        await prisma.submission.update({
-          where: { id: submissionId },
-          data: { status: 'EVALUATED' },
+        const saved = await prisma.submission.updateMany({
+          where: { id: submissionId, userId, status: 'DRAFT', deletedAt: null },
+          data: {
+            status: 'EVALUATED',
+            submittedAt: now,
+            testScore,
+            testsPassedCount: passed,
+            testsTotalCount: suite.length,
+            executionTimeMs,
+            memoryUsedMb: mem,
+          },
         })
+        if (saved.count === 0) {
+          throw Object.assign(new Error('already_submitted'), { statusCode: 409 })
+        }
         return {
           status: 'EVALUATED' as const,
           testScore,
@@ -248,31 +309,6 @@ export function createSubmissionsService(prisma: PrismaClient, deps: Submissions
       if (flags.includes('score_failed')) {
         rationaleScore = 0
         summary = 'Scoring unavailable'
-        await prisma.submission.update({
-          where: { id: submissionId },
-          data: {
-            rationaleClarity: 0,
-            rationaleDepth: 0,
-            rationaleHonesty: 0,
-            rationaleScalability: 0,
-            rationaleScore: null,
-            rationaleSummary: summary,
-            rationaleFlags: flags,
-          },
-        })
-      } else {
-        await prisma.submission.update({
-          where: { id: submissionId },
-          data: {
-            rationaleClarity: clarity,
-            rationaleDepth: depth,
-            rationaleHonesty: honesty,
-            rationaleScalability: scalability,
-            rationaleScore,
-            rationaleSummary: summary,
-            rationaleFlags: flags,
-          },
-        })
       }
       const fq = await generateFollowUpQuestions({
         code: sub.code,
@@ -280,16 +316,124 @@ export function createSubmissionsService(prisma: PrismaClient, deps: Submissions
         challengeTitle: ch.title,
         rationaleSummary: summary,
       })
+      const rationalePayload = flags.includes('score_failed')
+        ? {
+            rationaleClarity: 0,
+            rationaleDepth: 0,
+            rationaleHonesty: 0,
+            rationaleScalability: 0,
+            rationaleScore: null as number | null,
+            rationaleSummary: summary,
+            rationaleFlags: flags,
+          }
+        : {
+            rationaleClarity: clarity,
+            rationaleDepth: depth,
+            rationaleHonesty: honesty,
+            rationaleScalability: scalability,
+            rationaleScore,
+            rationaleSummary: summary,
+            rationaleFlags: flags,
+          }
+      const savedPending = await prisma.submission.updateMany({
+        where: { id: submissionId, userId, status: 'DRAFT', deletedAt: null },
+        data: {
+          status: 'SUBMITTED',
+          submittedAt: now,
+          testScore,
+          testsPassedCount: passed,
+          testsTotalCount: suite.length,
+          executionTimeMs,
+          memoryUsedMb: mem,
+          ...rationalePayload,
+          verificationQuestions: fq.questions as unknown as Prisma.InputJsonValue,
+          verificationStatus: 'PENDING',
+          verificationRetryCount: 0,
+        },
+      })
+      if (savedPending.count === 0) {
+        throw Object.assign(new Error('already_submitted'), { statusCode: 409 })
+      }
+      return {
+        status: 'AWAITING_VERIFICATION' as const,
+        submissionId,
+        questions: fq.questions.map((q) => q.prompt),
+      }
+    },
+
+    async verifySubmissionAnswers(submissionId: string, userId: string, body: VerifyAnswersBody) {
+      const sub = await prisma.submission.findFirst({
+        where: { id: submissionId, userId, deletedAt: null },
+        include: { challenge: true },
+      })
+      if (!sub) throw Object.assign(new Error('not_found'), { statusCode: 404 })
+      if (sub.status !== 'SUBMITTED') {
+        throw Object.assign(new Error('verify_not_pending'), { statusCode: 400 })
+      }
+      const vs = sub.verificationStatus
+      if (vs !== 'PENDING' && vs !== 'RETRY') {
+        throw Object.assign(new Error('verify_not_pending'), { statusCode: 400 })
+      }
+      const rawQ = sub.verificationQuestions
+      if (!rawQ || !Array.isArray(rawQ)) {
+        throw Object.assign(new Error('verify_questions_missing'), { statusCode: 500 })
+      }
+      const qs = rawQ as { id: string; prompt: string }[]
+      if (qs.length !== 2) {
+        throw Object.assign(new Error('verify_questions_missing'), { statusCode: 500 })
+      }
+      const qTexts = [qs[0].prompt, qs[1].prompt] as [string, string]
+      const aTexts = [body.answers[0], body.answers[1]] as [string, string]
+      const scored = await scoreVerificationAnswers({
+        questions: qTexts,
+        answers: aTexts,
+        code: sub.code,
+      })
+      if (scored.kind === 'unavailable') {
+        return {
+          verified: false as const,
+          unavailable: true as const,
+          message:
+            'Verification is temporarily unavailable. Your answers were not submitted. Please try again in a moment.',
+        }
+      }
+      const now = new Date()
+      if (scored.score >= 60) {
+        await finalizePublishSubmission(submissionId, userId, sub.challenge, now)
+        await prisma.submission.update({
+          where: { id: submissionId },
+          data: { verificationStatus: 'PASSED' },
+        })
+        return {
+          verified: true as const,
+          repAwarded: 0,
+        }
+      }
+      if (sub.verificationRetryCount < 1) {
+        await prisma.submission.update({
+          where: { id: submissionId },
+          data: {
+            verificationRetryCount: 1,
+            verificationStatus: 'RETRY',
+          },
+        })
+        return {
+          verified: false as const,
+          canRetry: true as const,
+          message: 'Your answers did not demonstrate sufficient understanding.',
+        }
+      }
       await prisma.submission.update({
         where: { id: submissionId },
         data: {
-          status: 'AWAITING_FOLLOWUP',
-          followUpQuestions: fq.questions as unknown as Prisma.InputJsonValue,
+          status: 'EVALUATED',
+          verificationStatus: 'FAILED',
         },
       })
       return {
-        status: 'AWAITING_FOLLOWUP' as const,
-        followUpQuestions: fq.questions,
+        verified: false as const,
+        canRetry: false as const,
+        message: 'Your answers did not demonstrate sufficient understanding.',
       }
     },
 
@@ -359,7 +503,7 @@ export function createSubmissionsService(prisma: PrismaClient, deps: Submissions
         await tx.submission.update({
           where: { id: submissionId },
           data: {
-            status: 'DRAFT',
+            status: 'WITHDRAWN',
             submittedAt: null,
             testScore: null,
             testsPassedCount: null,
@@ -382,6 +526,9 @@ export function createSubmissionsService(prisma: PrismaClient, deps: Submissions
             memoryUsedMb: null,
             followUpQuestions: Prisma.DbNull,
             followUpAnswers: Prisma.DbNull,
+            verificationQuestions: Prisma.DbNull,
+            verificationStatus: null,
+            verificationRetryCount: 0,
           },
         })
       })
@@ -429,6 +576,10 @@ export function createSubmissionsService(prisma: PrismaClient, deps: Submissions
         },
       })
       await finalizePublishSubmission(submissionId, userId, sub.challenge, now)
+      await prisma.submission.update({
+        where: { id: submissionId },
+        data: { verificationStatus: 'SKIPPED' },
+      })
       return prisma.submission.findFirst({
         where: { id: submissionId },
         include: { challenge: true },
@@ -437,10 +588,15 @@ export function createSubmissionsService(prisma: PrismaClient, deps: Submissions
 
     async getSubmissionsByChallenge(challengeId: string, page: number, limit: number) {
       const skip = (page - 1) * limit
-      const where = {
+      const where: Prisma.SubmissionWhereInput = {
         challengeId,
-        status: 'PUBLISHED' as const,
+        status: 'PUBLISHED',
         deletedAt: null,
+        OR: [
+          { verificationStatus: null },
+          { verificationStatus: 'PASSED' },
+          { verificationStatus: 'SKIPPED' },
+        ],
       }
       const [items, total] = await Promise.all([
         prisma.submission.findMany({
@@ -479,8 +635,63 @@ export function createSubmissionsService(prisma: PrismaClient, deps: Submissions
       })
       if (!sub) return null
       if (sub.userId === requestingUserId) return sub
-      if (sub.status === 'PUBLISHED') return sub
-      return null
+      if (sub.status !== 'PUBLISHED') return null
+      const vs = sub.verificationStatus
+      if (vs != null && vs !== 'PASSED' && vs !== 'SKIPPED') return null
+      return sub
+    },
+
+    async getChallengeSubmissionStats(challengeId: string) {
+      const where: Prisma.SubmissionWhereInput = {
+        challengeId,
+        status: 'PUBLISHED',
+        deletedAt: null,
+        OR: [
+          { verificationStatus: null },
+          { verificationStatus: 'PASSED' },
+          { verificationStatus: 'SKIPPED' },
+        ],
+      }
+      const rows = await prisma.submission.findMany({
+        where,
+        select: {
+          language: true,
+          testScore: true,
+          rationaleScore: true,
+        },
+      })
+      const total = rows.length
+      if (total === 0) {
+        return {
+          totalSubmissions: 0,
+          languageDistribution: [] as { language: string; count: number; percentage: number }[],
+          avgTestScore: 0,
+          avgRationaleScore: 0,
+        }
+      }
+      const byLang = new Map<string, number>()
+      let testSum = 0
+      let ratSum = 0
+      let ratN = 0
+      for (const r of rows) {
+        byLang.set(r.language, (byLang.get(r.language) ?? 0) + 1)
+        testSum += r.testScore ?? 0
+        if (r.rationaleScore != null) {
+          ratSum += r.rationaleScore
+          ratN += 1
+        }
+      }
+      const languageDistribution = [...byLang.entries()].map(([language, count]) => ({
+        language,
+        count,
+        percentage: Math.round((count / total) * 1000) / 10,
+      }))
+      return {
+        totalSubmissions: total,
+        languageDistribution,
+        avgTestScore: Math.round((testSum / total) * 10) / 10,
+        avgRationaleScore: ratN > 0 ? Math.round((ratSum / ratN) * 10) / 10 : 0,
+      }
     },
 
     async softDeleteDraft(submissionId: string, userId: string) {

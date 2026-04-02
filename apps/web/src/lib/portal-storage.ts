@@ -3,6 +3,8 @@ export const PORTAL_STORAGE_KEY = 'hackadevs.portal'
 export type PortalSession = {
   portalId: string
   portalSecret: string
+  companyName?: string
+  isApproved?: boolean
 }
 
 export function readPortalSession(): PortalSession | null {
@@ -17,7 +19,12 @@ export function readPortalSession(): PortalSession | null {
       parsed.portalId.length > 0 &&
       parsed.portalSecret.length > 0
     ) {
-      return parsed
+      return {
+        portalId: parsed.portalId,
+        portalSecret: parsed.portalSecret,
+        companyName: typeof parsed.companyName === 'string' ? parsed.companyName : undefined,
+        isApproved: typeof parsed.isApproved === 'boolean' ? parsed.isApproved : undefined,
+      }
     }
     return null
   } catch {

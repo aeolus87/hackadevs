@@ -5,7 +5,10 @@ import type { Category, ChallengeStatus } from '@/types/hackadevs-api.types'
 import { useAdminChallenges, type AdminChallengeRow } from '@/hooks/admin/useAdminChallenges'
 import { usePublishChallenge } from '@/hooks/admin/usePublishChallenge'
 import { useDeleteChallenge } from '@/hooks/admin/useDeleteChallenge'
+import { useArchiveChallenge } from '@/hooks/admin/useArchiveChallenge'
+import { useCloseChallenge } from '@/hooks/admin/useCloseChallenge'
 import { useGenerateChallenge } from '@/hooks/admin/useGenerateChallenge'
+import { useToast } from '@/contexts/toast-context'
 import { AdminChallengeEditDrawer } from './admin-challenge-edit-drawer'
 
 const TABS: { label: string; status: ChallengeStatus }[] = [
@@ -89,6 +92,12 @@ export default function AdminChallengesPage() {
     setDrawerOpen(false)
   })
   const { mutate: generate, loading: genBusy, error: genErr } = useGenerateChallenge()
+  const toast = useToast()
+  const { mutate: closeChallengeRow } = useCloseChallenge(() => {
+    toast.push('Challenge closed. Rankings computing.', 'success')
+    void refetch()
+  })
+  const { mutate: archiveChallengeRow } = useArchiveChallenge(() => void refetch())
 
   const rangeLabel = useMemo(() => {
     const now = new Date()
@@ -124,15 +133,15 @@ export default function AdminChallengesPage() {
           <span className="rounded-full border border-hd-emerald/30 bg-hd-emerald/10 px-3 py-1 font-mono text-xs text-hd-emerald">
             Active challenges · {activeMeta?.total ?? 0}
           </span>
-          {canWrite && (
-            <button
-              type="button"
-              onClick={() => setGenOpen(true)}
-              className="rounded-full border border-hd-indigo px-4 py-2 text-sm font-medium text-hd-indigo-tint hover:bg-hd-indigo-surface"
-            >
-              Generate new
-            </button>
-          )}
+          <button
+            type="button"
+            disabled={!canWrite}
+            title={!canWrite ? 'Admin only' : undefined}
+            onClick={() => canWrite && setGenOpen(true)}
+            className={`rounded-full border border-hd-indigo px-4 py-2 text-sm font-medium text-hd-indigo-tint hover:bg-hd-indigo-surface disabled:cursor-not-allowed disabled:opacity-40`}
+          >
+            Generate new
+          </button>
         </div>
       </div>
 
@@ -271,6 +280,56 @@ export default function AdminChallengesPage() {
                             stroke="currentColor"
                           >
                             <path d="M3 6h18M8 6V4h8v2M19 6v14H5V6M10 11v6M14 11v6" />
+                          </svg>
+                        </button>
+                      )}
+                      {canWrite && row.status === 'ACTIVE' && (
+                        <button
+                          type="button"
+                          title="Close challenge"
+                          onClick={() => {
+                            if (
+                              !window.confirm(
+                                'Close this challenge? Submissions will lock and preliminary ranking will run.',
+                              )
+                            ) {
+                              return
+                            }
+                            void closeChallengeRow(row.id).catch((e) => {
+                              const msg = e instanceof Error ? e.message : 'Could not close'
+                              toast.push(msg, 'error')
+                            })
+                          }}
+                          className="rounded-md p-2 text-hd-muted hover:bg-hd-hover hover:text-hd-amber"
+                        >
+                          <svg
+                            className="h-4 w-4"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                          >
+                            <rect x="6" y="11" width="12" height="9" rx="1" strokeWidth="2" />
+                            <path strokeWidth="2" d="M9 11V8a3 3 0 016 0v3" strokeLinecap="round" />
+                          </svg>
+                        </button>
+                      )}
+                      {canWrite && row.status === 'CLOSED' && (
+                        <button
+                          type="button"
+                          title="Archive"
+                          onClick={() => void archiveChallengeRow(row.id)}
+                          className="rounded-md p-2 text-hd-muted hover:bg-hd-hover hover:text-hd-text"
+                        >
+                          <svg
+                            className="h-4 w-4"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeWidth="2"
+                              d="M4 7h16M6 7V5h12v2M9 11v6M15 11v6M8 21h8l1-8H7l1 8z"
+                            />
                           </svg>
                         </button>
                       )}

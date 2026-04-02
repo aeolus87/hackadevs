@@ -36,6 +36,12 @@
 }
 
 @layer base {
+  :root {
+    --input: var(--color-hd-surface);
+    --input-border: var(--color-hd-border);
+    --input-text: var(--color-hd-text);
+  }
+
   html {
     font-family: var(--font-sans);
     font-weight: 400;
@@ -53,6 +59,38 @@
   pre,
   .font-mono {
     font-family: var(--font-mono);
+  }
+
+  button:focus,
+  button:focus-visible,
+  a:focus,
+  a:focus-visible,
+  input:focus,
+  input:focus-visible,
+  textarea:focus,
+  textarea:focus-visible,
+  select:focus,
+  select:focus-visible {
+    outline: none;
+  }
+
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active,
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus,
+  textarea:-webkit-autofill:active,
+  select:-webkit-autofill,
+  select:-webkit-autofill:hover,
+  select:-webkit-autofill:focus,
+  select:-webkit-autofill:active {
+    -webkit-text-fill-color: var(--input-text);
+    caret-color: var(--input-text);
+    box-shadow: 0 0 0 1000px var(--input) inset;
+    border-color: var(--input-border);
+    transition: background-color 99999s ease-out;
   }
 }
 

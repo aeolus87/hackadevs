@@ -22,7 +22,7 @@ export function useLogout() {
       setLoading(false)
       window.location.replace('/')
     }
-  }, [clearSession])
+  }, [clearSession, refreshToken])
 
   return { mutate, loading, error }
 }

@@ -33,6 +33,7 @@ export function useRegisterPortal() {
       return unwrapSuccessData<{
         portalId: string
         portalSecret: string
+        portal: { companyName: string; isApproved: boolean }
       }>(res.data)
     } catch (e) {
       const { message } = parseAxiosError(e)

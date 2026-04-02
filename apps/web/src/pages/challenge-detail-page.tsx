@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ChallengeSubmissionBanner } from '@/components/challenge/challenge-submission-banner'
+import { LanguageMixDonut, statsToDonutSlices } from '@/components/challenge/language-mix-donut'
 import { ChallengeDetail } from '@/components/challenge-detail'
 import { DifficultyBadge } from '@/components/difficulty-badge'
 import { InlineError } from '@/components/inline-error'
@@ -8,10 +10,49 @@ import { SkeletonCard } from '@/components/skeleton-card'
 import { useAuthUser } from '@/contexts/auth-context'
 import { useUnreadCount } from '@/hooks/notifications/useUnreadCount'
 import { useChallenge } from '@/hooks/challenges/useChallenge'
+import { useChallengeStats } from '@/hooks/submissions/useChallengeStats'
 import { useMySubmission } from '@/hooks/submissions/useMySubmission'
 import { useSubmissions } from '@/hooks/submissions/useSubmissions'
 import { apiChallengeToUi } from '@/utils/map-api-challenge'
-import { getVotingState, votingPhaseLabel } from '@/utils/voting-ui'
+import { loginPath } from '@/utils/login-path'
+import { getVotingState, votingPhaseLabel, type VotingState } from '@/utils/voting-ui'
+import type { Submission } from '@/types/hackadevs-api.types'
+
+function submittedShort(iso?: string): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+function closesDiscussLabel(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+  } catch {
+    return iso
+  }
+}
+
+function spotlightRows(list: Submission[], votingState: VotingState): Submission[] {
+  if (!list.length) return []
+  if (votingState === 'active') {
+    return [...list]
+      .sort((a, b) => {
+        const ta = a.submittedAt ? new Date(a.submittedAt).getTime() : 0
+        const tb = b.submittedAt ? new Date(b.submittedAt).getTime() : 0
+        return tb - ta
+      })
+      .slice(0, 5)
+  }
+  return [...list]
+    .sort((a, b) => {
+      if (b.upvoteCount !== a.upvoteCount) return b.upvoteCount - a.upvoteCount
+      const ta = a.submittedAt ? new Date(a.submittedAt).getTime() : 0
+      const tb = b.submittedAt ? new Date(b.submittedAt).getTime() : 0
+      return tb - ta
+    })
+    .slice(0, 5)
+}
 
 export default function ChallengeDetailPage() {
   const { slug = '' } = useParams()
@@ -25,8 +66,14 @@ export default function ChallengeDetailPage() {
       ? getVotingState(apiCh.closesAt, apiCh.votingSettled)
       : ('active' as const)
   const votingPill = apiCh?.closesAt != null ? votingPhaseLabel(votingState, apiCh.closesAt) : null
-  const { data: mine } = useMySubmission(challengeId)
-  const { data: subs } = useSubmissions(challengeId, { page: 1, sortBy: 'compositeScore' })
+  const { data: mine, refetch: refetchMine } = useMySubmission(challengeId)
+  const { data: subs } = useSubmissions(challengeId, { page: 1 })
+  const { data: chStats, loading: chStatsLoading } = useChallengeStats(challengeId)
+
+  const spotlightList = useMemo(
+    () => spotlightRows(subs?.data ?? [], votingState),
+    [subs?.data, votingState],
+  )
 
   const submissionLangSlices = useMemo(() => {
     const list = subs?.data ?? []
@@ -45,6 +92,13 @@ export default function ChallengeDetailPage() {
       color: colors[i++ % colors.length] ?? '#94a3b8',
     }))
   }, [subs?.data])
+
+  const now = new Date()
+  const chClosed =
+    apiCh?.status === 'CLOSED' ||
+    apiCh?.status === 'ARCHIVED' ||
+    (apiCh?.closesAt != null && new Date(apiCh.closesAt) <= now)
+  const chActive = apiCh?.status === 'ACTIVE' && !chClosed
 
   if (loading && !apiCh) {
     return (
@@ -78,72 +132,26 @@ export default function ChallengeDetailPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      {isAuthenticated && mine?.status === 'DRAFT' && (
-        <div className="mb-4 rounded-[12px] border border-hd-amber/30 bg-hd-amber/10 px-4 py-3 text-sm text-hd-secondary">
-          You have a draft in progress.{' '}
-          <Link
-            to={`/challenge/${challenge.slug}/submit`}
-            className="font-medium text-hd-indigo-tint hover:text-hd-indigo-hover"
-          >
-            Resume
-          </Link>
-        </div>
-      )}
-      {isAuthenticated && mine?.status === 'AWAITING_FOLLOWUP' && (
-        <div className="mb-4 rounded-[12px] border border-hd-amber/30 bg-hd-amber/10 px-4 py-3 text-sm text-hd-secondary">
-          Verification required — answer two short questions about your code before your solution is
-          published.{' '}
-          <Link
-            to={`/challenge/${challenge.slug}/submit`}
-            className="font-medium text-hd-indigo-tint hover:text-hd-indigo-hover"
-          >
-            Continue
-          </Link>
-        </div>
-      )}
-      {isAuthenticated && mine && mine.status === 'PUBLISHED' && mine.id && (
-        <div className="mb-4 rounded-[12px] border border-hd-indigo/30 bg-hd-indigo-surface px-4 py-3 text-sm text-hd-secondary">
-          <span className="text-hd-text">Your solution is live.</span>{' '}
-          {mine.testScore != null && (
-            <span className="font-mono text-[12px] text-hd-muted">
-              Tests {Math.round(mine.testScore)}%
-              {mine.rationaleScore != null ? ` · Rationale ${mine.rationaleScore}/100` : ''}
-            </span>
-          )}{' '}
-          <Link
-            to={`/challenge/${challenge.slug}/solutions/${mine.id}`}
-            className="font-medium text-hd-indigo-tint hover:text-hd-indigo-hover"
-          >
-            Open your solution
-          </Link>
-          {apiCh?.status === 'ACTIVE' &&
-            apiCh.closesAt != null &&
-            new Date(apiCh.closesAt) > new Date() && (
-              <>
-                {' '}
-                ·{' '}
-                <Link
-                  to={`/challenge/${challenge.slug}/submit`}
-                  className="font-medium text-hd-amber hover:text-hd-amber/90"
-                >
-                  Revise before close
-                </Link>
-              </>
-            )}
-        </div>
-      )}
+      {isAuthenticated && apiCh ? (
+        <ChallengeSubmissionBanner
+          submission={mine}
+          apiChallenge={apiCh}
+          challengeSlug={challenge.slug}
+          onWithdrawSuccess={() => void refetchMine()}
+        />
+      ) : null}
       {isAuthenticated &&
         mine &&
         mine.status !== 'DRAFT' &&
         mine.status !== 'WITHDRAWN' &&
         mine.status !== 'AWAITING_FOLLOWUP' &&
-        mine.status !== 'PUBLISHED' && (
+        mine.status !== 'PUBLISHED' &&
+        mine.status !== 'SUBMITTED' &&
+        mine.status !== 'FLAGGED' && (
           <div className="mb-4 rounded-[12px] border border-hd-border bg-hd-card px-4 py-3 text-sm text-hd-secondary">
             {mine.status === 'EVALUATED'
               ? 'Your submission was scored but did not reach the publish threshold.'
-              : mine.status === 'FLAGGED'
-                ? 'Open submit to continue — verification questions are next (rationale already scored).'
-                : 'You have a submission on this challenge.'}
+              : 'You have a submission on this challenge.'}
           </div>
         )}
       <div className="rounded-[16px] border border-hd-border bg-hd-indigo-surface px-4 py-6 md:px-8 md:py-8">
@@ -200,7 +208,11 @@ export default function ChallengeDetailPage() {
             {isAuthenticated && mine?.status === 'PUBLISHED' ? 'Your solution' : 'Start solving'}
           </Link>
           <Link
-            to={`/challenge/${challenge.slug}/solutions`}
+            to={
+              isAuthenticated
+                ? `/challenge/${challenge.slug}/solutions`
+                : loginPath(`/challenge/${challenge.slug}/solutions`)
+            }
             className="inline-flex h-11 items-center justify-center rounded-full border border-hd-border px-6 text-sm font-medium text-hd-text transition-colors duration-150 ease-out hover:border-hd-border-hover"
           >
             View solutions
@@ -246,17 +258,36 @@ export default function ChallengeDetailPage() {
           ) : null}
           <div className="rounded-[12px] border border-hd-border bg-hd-card p-5">
             <h3 className="mb-4 text-sm font-medium text-hd-text">Submission stats</h3>
-            {submissionLangSlices.length > 0 ? (
+            {chStats && chStats.totalSubmissions > 0 ? (
+              <LanguageMixDonut
+                slices={statsToDonutSlices(chStats.languageDistribution)}
+                totalLabel={String(chStats.totalSubmissions)}
+                loading={chStatsLoading}
+              />
+            ) : submissionLangSlices.length > 0 ? (
               <RatingDonut slices={submissionLangSlices} />
             ) : (
               <p className="text-sm text-hd-muted">Stats appear once submissions are in.</p>
             )}
           </div>
           <div className="rounded-[12px] border border-hd-border bg-hd-card p-5">
-            <h3 className="mb-3 text-sm font-medium text-hd-text">Top solutions by votes</h3>
+            <h3 className="mb-1 text-sm font-medium text-hd-text">
+              {votingState === 'active' ? 'Recent solutions' : 'Top by upvotes'}
+            </h3>
+            {votingState === 'active' ? (
+              <p className="mb-3 text-[12px] leading-snug text-hd-muted">
+                Upvotes and standings matter after this challenge closes. Profile rep is credited
+                when results are final.
+              </p>
+            ) : (
+              <p className="mb-3 text-[12px] leading-snug text-hd-muted">
+                Ranked by upvotes (ties newest first). Rep from this challenge is applied when
+                results settle.
+              </p>
+            )}
             <ol className="space-y-3">
-              {subs?.data && subs.data.length > 0 ? (
-                subs.data.slice(0, 5).map((s, i) => (
+              {spotlightList.length > 0 ? (
+                spotlightList.map((s, i) => (
                   <li key={s.id} className="flex items-center gap-3">
                     <span className="font-mono text-xs text-hd-muted">{i + 1}</span>
                     <div className="min-w-0 flex-1">
@@ -267,7 +298,9 @@ export default function ChallengeDetailPage() {
                         Solution · {s.user?.displayName ?? s.userId.slice(0, 8)}
                       </Link>
                     </div>
-                    <span className="font-mono text-xs text-hd-secondary">{s.upvoteCount}</span>
+                    <span className="shrink-0 font-mono text-xs text-hd-secondary">
+                      {votingState === 'active' ? submittedShort(s.submittedAt) : s.upvoteCount}
+                    </span>
                   </li>
                 ))
               ) : (
@@ -288,38 +321,108 @@ export default function ChallengeDetailPage() {
           </div>
         </aside>
       </div>
-      <section
-        id="discuss"
-        className="mt-16 scroll-mt-28 rounded-[12px] border border-hd-border bg-hd-card p-6"
-      >
-        <h2 className="text-base font-medium text-hd-text">Discussion</h2>
-        <p className="mt-2 text-sm text-hd-muted">No comments yet. Start the thread.</p>
-        {isAuthenticated && mine?.status === 'PUBLISHED' && mine.id ? (
-          <Link
-            to={`/challenge/${challenge.slug}/solutions/${mine.id}`}
-            className="mt-4 inline-flex rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover"
-          >
-            View your solution
-          </Link>
-        ) : isAuthenticated && mine?.status === 'DRAFT' ? (
-          <Link
-            to={`/challenge/${challenge.slug}/submit`}
-            className="mt-4 inline-flex rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover"
-          >
-            Resume your draft
-          </Link>
-        ) : (
-          <Link
-            to={isAuthenticated ? `/challenge/${challenge.slug}/submit` : '/login'}
-            state={
-              isAuthenticated ? undefined : { returnTo: `/challenge/${challenge.slug}/submit` }
-            }
-            className="mt-4 inline-flex rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover"
-          >
-            Submit a solution
-          </Link>
-        )}
-      </section>
+      {!(isAuthenticated && mine && (mine.status === 'FLAGGED' || mine.status === 'EVALUATED')) ? (
+        <section
+          id="discuss"
+          className="mt-16 scroll-mt-28 rounded-[12px] border border-hd-border bg-hd-card p-6"
+        >
+          <h2 className="text-base font-medium text-hd-text">Discussion</h2>
+          <p className="mt-1 font-mono text-[11px] text-hd-muted">0 comments</p>
+          <div className="mt-4 border-t border-hd-border pt-4">
+            {!isAuthenticated ? (
+              <>
+                <p className="text-sm text-hd-secondary">
+                  Join the discussion after you submit your solution.
+                </p>
+                <Link
+                  to={loginPath(`/challenge/${challenge.slug}/submit`)}
+                  className="mt-4 inline-flex rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover"
+                >
+                  Sign in to solve
+                </Link>
+              </>
+            ) : mine?.status === 'DRAFT' ? (
+              <>
+                <p className="text-sm text-hd-secondary">
+                  Finish your solution to unlock discussion.
+                </p>
+                <Link
+                  to={`/challenge/${challenge.slug}/submit`}
+                  className="mt-4 inline-flex rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover"
+                >
+                  Resume draft
+                </Link>
+              </>
+            ) : mine?.status === 'SUBMITTED' || mine?.status === 'AWAITING_FOLLOWUP' ? (
+              <>
+                <p className="text-sm text-hd-secondary">
+                  Finish your solution to unlock discussion.
+                </p>
+                <Link
+                  to={`/challenge/${challenge.slug}/submit`}
+                  className="mt-4 inline-flex rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover"
+                >
+                  Continue submit
+                </Link>
+              </>
+            ) : mine?.status === 'PUBLISHED' && chActive && apiCh?.closesAt ? (
+              <p className="text-sm text-hd-secondary">
+                Discussion unlocks after the challenge closes. Check back on{' '}
+                {closesDiscussLabel(apiCh.closesAt)}.
+              </p>
+            ) : (mine?.status === 'PUBLISHED' && !chActive) || mine?.status === 'WITHDRAWN' ? (
+              <>
+                <p className="text-sm text-hd-secondary">Discussion is open for this challenge.</p>
+                <p className="mt-3 text-sm text-hd-muted">
+                  No comments yet. Start the conversation.
+                </p>
+                <label className="mt-4 block text-[13px] text-hd-muted" htmlFor="discuss-draft">
+                  Share a thought, ask a question…
+                </label>
+                <textarea
+                  id="discuss-draft"
+                  disabled
+                  rows={3}
+                  title="Comments coming soon"
+                  className="mt-1 w-full cursor-not-allowed rounded-[10px] border border-hd-border bg-hd-surface/50 px-3 py-2 text-sm text-hd-muted"
+                />
+                <button
+                  type="button"
+                  disabled
+                  title="Comments coming soon"
+                  className="mt-3 rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white opacity-40"
+                >
+                  Post
+                </button>
+              </>
+            ) : !mine ? (
+              <>
+                <p className="text-sm text-hd-secondary">
+                  Submit a solution to unlock discussion when the challenge allows it.
+                </p>
+                <Link
+                  to={`/challenge/${challenge.slug}/submit`}
+                  className="mt-4 inline-flex rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover"
+                >
+                  Start solving
+                </Link>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-hd-secondary">
+                  Submit a published solution to join the thread when the challenge allows it.
+                </p>
+                <Link
+                  to={`/challenge/${challenge.slug}/submit`}
+                  className="mt-4 inline-flex rounded-full bg-hd-indigo px-4 py-2 text-sm font-medium text-white hover:bg-hd-indigo-hover"
+                >
+                  Go to submit
+                </Link>
+              </>
+            )}
+          </div>
+        </section>
+      ) : null}
     </div>
   )
 }

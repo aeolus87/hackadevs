@@ -37,3 +37,12 @@ export const patchMeSchema = z.object({
 })
 
 export type PatchMeBody = z.infer<typeof patchMeSchema>
+
+const allowedAvatarContentTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const
+
+export const avatarUploadSchema = z.object({
+  filename: z.string().min(1).max(512),
+  contentType: z.enum(allowedAvatarContentTypes),
+})
+
+export type AvatarUploadBody = z.infer<typeof avatarUploadSchema>

@@ -36,6 +36,11 @@ const FollowUpOutputSchema = z.object({
     .length(2),
 })
 
+const VerificationScoreSchema = z.object({
+  score: z.number(),
+  feedback: z.string(),
+})
+
 export type FollowUpQuestionItem = { id: string; prompt: string }
 
 export type ChallengeGenerationResult = z.infer<typeof ChallengeOutputSchema> & {
@@ -231,5 +236,58 @@ Use ids "q1" and "q2". Each prompt under 600 characters.`,
     return { questions: out.questions }
   } catch {
     return { questions: FALLBACK_FOLLOWUP }
+  }
+}
+
+export type VerificationScoreOutcome =
+  | { kind: 'ok'; score: number; feedback: string }
+  | { kind: 'unavailable'; feedback: string }
+
+export async function scoreVerificationAnswers(params: {
+  questions: [string, string]
+  answers: [string, string]
+  code: string
+}): Promise<VerificationScoreOutcome> {
+  const client = getOpenAI()
+  const truncated = params.code.slice(0, 12000)
+  if (!client) {
+    return { kind: 'unavailable', feedback: 'verification_unavailable' }
+  }
+  try {
+    const response = await client.chat.completions.create({
+      model: SCORING_MODEL,
+      response_format: { type: 'json_object' },
+      temperature: 0.1,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You check whether a developer understands their own code. Be strict but fair. Return only valid JSON.',
+        },
+        {
+          role: 'user',
+          content: `Code:
+\`\`\`
+${truncated}
+\`\`\`
+
+Q1: ${params.questions[0]}
+A1: ${params.answers[0]}
+
+Q2: ${params.questions[1]}
+A2: ${params.answers[1]}
+
+Score the answers 0-100. Passing means the answers show genuine understanding of THIS specific code — not generic algorithm knowledge. Vague answers score below 60.
+
+Return JSON: { "score": number, "feedback": string }`,
+        },
+      ],
+    })
+    const text = response.choices[0]?.message?.content
+    if (!text) return { kind: 'ok', score: 0, feedback: 'empty_response' }
+    const parsed = VerificationScoreSchema.parse(JSON.parse(text))
+    return { kind: 'ok', score: parsed.score, feedback: parsed.feedback }
+  } catch {
+    return { kind: 'ok', score: 0, feedback: 'scoring_failed' }
   }
 }

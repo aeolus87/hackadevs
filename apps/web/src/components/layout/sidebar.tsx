@@ -1,6 +1,8 @@
-import { NavLink, useLocation } from 'react-router-dom'
+import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useAuthUser } from '@/contexts/auth-context'
+import { HackaDevsMark } from '@/components/layout/hackadevs-mark'
 import { NavIcon } from '@/components/layout/nav-icons'
+import { useAdminPortalStats } from '@/hooks/admin/useAdminPortalStats'
 
 const nav = [
   { to: '/feed', label: 'Home', icon: 'feed' as const },
@@ -24,10 +26,21 @@ export function Sidebar() {
     ? { returnTo: `${location.pathname}${location.search}` }
     : undefined
   const staff = user?.role === 'ADMIN' || user?.role === 'MODERATOR'
+  const { pendingCount: pendingPortals } = useAdminPortalStats(Boolean(staff))
 
   return (
-    <aside className="fixed left-0 top-14 z-20 hidden h-[calc(100vh-3.5rem)] w-[232px] flex-col border-r border-hd-border/80 bg-hd-surface/95 backdrop-blur-xl md:flex">
-      <nav className="flex flex-1 flex-col gap-1 px-2.5 pb-3 pt-6">
+    <aside className="fixed left-0 top-0 z-20 hidden h-screen w-[232px] flex-col border-r border-hd-border/80 bg-hd-surface/95 backdrop-blur-xl md:flex">
+      <Link
+        to="/feed"
+        className="flex min-h-[4.25rem] shrink-0 items-center gap-3 px-3 py-2.5 sm:px-4 sm:py-3"
+        aria-label="HackaDevs home"
+      >
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center text-hd-text">
+          <HackaDevsMark className="h-7 w-7" />
+        </span>
+        <span className="text-[15px] font-semibold tracking-tight text-hd-text">HackaDevs</span>
+      </Link>
+      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2.5 pb-3 pt-4">
         {nav.map((item) => (
           <NavLink key={item.to} to={item.to} className={navLinkClass}>
             <span className="flex items-center gap-3">
@@ -45,6 +58,22 @@ export function Sidebar() {
               <span className="flex items-center gap-3">
                 <NavIcon name="challenges" className="h-[18px] w-[18px] shrink-0 opacity-90" />
                 Challenges
+              </span>
+            </NavLink>
+            <NavLink to="/admin/portals" className={navLinkClass}>
+              <span className="flex w-full items-center justify-between gap-2">
+                <span className="flex items-center gap-3">
+                  <NavIcon name="grid" className="h-[18px] w-[18px] shrink-0 opacity-90" />
+                  Portals
+                </span>
+                {pendingPortals > 0 ? (
+                  <span
+                    className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-hd-amber px-1.5 font-mono text-[10px] font-semibold text-hd-text"
+                    aria-label={`${pendingPortals} pending portals`}
+                  >
+                    {pendingPortals > 99 ? '99+' : pendingPortals}
+                  </span>
+                ) : null}
               </span>
             </NavLink>
           </>
